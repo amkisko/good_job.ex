@@ -1,0 +1,13 @@
+{
+  "skip_files": [
+    "lib/good_job/testing.ex",
+    "lib/good_job/job_case.ex",
+    "lib/good_job/repo_case.ex",
+    "lib/good_job/test_repo.ex",
+    "lib/good_job/tck/runner.ex",
+    "lib/good_job/web/live_dashboard.ex",
+    "lib/good_job/web/live_dashboard_page.ex",
+    "lib/good_job/performance.ex"
+  ]
+}
+

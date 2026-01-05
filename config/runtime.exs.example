@@ -1,0 +1,28 @@
+# Example runtime configuration for GoodJob
+# Copy this to config/runtime.exs and customize for your needs
+
+import Config
+
+# Configure GoodJob repository from DATABASE_URL
+# Priority: GOOD_JOB_DATABASE_URL > DATABASE_URL
+if database_url = System.get_env("GOOD_JOB_DATABASE_URL") || System.get_env("DATABASE_URL") do
+  # Get the repo module from config
+  repo_module = Application.get_env(:good_job, :config, %{})[:repo] ||
+                Application.get_env(:my_app, :repo_module) ||
+                raise "GoodJob repo not configured"
+
+  # Parse and configure database URL
+  GoodJob.DatabaseURL.configure_repo(repo_module, database_url)
+end
+
+# Alternative: Manual configuration with URL parsing
+# if database_url = GoodJob.DatabaseURL.from_env() do
+#   config_params = GoodJob.DatabaseURL.parse(database_url)
+#   
+#   config :my_app, MyApp.Repo,
+#     Keyword.merge([
+#       pool_size: 10,
+#       timeout: 5000
+#     ], config_params)
+# end
+

@@ -1,0 +1,8 @@
+<div class="stats-grid">
+  <%= render partial: "home/stat_card", locals: { label: "Queued", value: stats[:queued] } %>
+  <%= render partial: "home/stat_card", locals: { label: "Running", value: stats[:running] } %>
+  <%= render partial: "home/stat_card", locals: { label: "Finished", value: stats[:finished] } %>
+  <%= render partial: "home/stat_card", locals: { label: "Discarded", value: stats[:discarded] } %>
+  <%= render partial: "home/stat_card", locals: { label: "Scheduled", value: stats[:scheduled] } %>
+</div>
+

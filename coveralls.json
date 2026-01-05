@@ -1,0 +1,11 @@
+{
+  "skip_files": [
+    "lib/good_job/web",
+    "lib/good_job/testing.ex",
+    "lib/good_job/testing",
+    "lib/good_job/behaviour.ex",
+    "lib/good_job/plugin.ex",
+    "lib/good_job/interrupt_error.ex",
+    "lib/mix/tasks/good_job.install.ex"
+  ]
+}

@@ -1,0 +1,94 @@
+# Production configuration example for GoodJob
+# Copy this to config/prod.exs and adjust for your environment
+
+import Config
+
+# Database connection pool configuration
+# For external mode (separate worker process):
+# pool_size = max_processes + 2 (utility operations) + 1 (notifier) = max_processes + 3
+config :my_app, MyApp.Repo,
+  pool_size: 25,  # Adjust based on max_processes (e.g., 20 + 2 + 1 = 23, round up to 25)
+  pool_timeout: 5_000,  # 5 seconds
+  timeout: 15_000,  # 15 seconds
+  queue_target: 50,  # Wait for connection if pool is busy
+  queue_interval: 1_000,  # Check every 1 second
+  # SSL for production
+  ssl: true,
+  ssl_opts: [
+    verify: :verify_peer,
+    cacertfile: System.get_env("DATABASE_CA_CERT_PATH", "/etc/ssl/certs/ca-certificates.crt")
+  ]
+
+# GoodJob configuration for production
+config :good_job,
+  repo: MyApp.Repo,
+  execution_mode: :external,  # Run in separate worker process
+  # Queue configuration with concurrency:
+  # Format: "queue1:concurrency1;queue2:concurrency2;*" (semicolon-separated pools)
+  # Or: "queue1:concurrency1,queue2:concurrency2" (comma-separated, legacy format)
+  # Examples:
+  #   "transactional_messages:2;batch_processing:1;*" - 3 pools with different concurrency
+  #   "high_priority:10,low_priority:2" - 2 schedulers, one per queue
+  #   "+queue1,queue2:5" - Ordered queues with 5 concurrent processes
+  queues: "*",  # Process all queues with default concurrency
+  max_processes: 20,  # Default concurrency (overridden by queue-specific concurrency)
+  poll_interval: 5,  # Poll every 5 seconds (lower = faster pickup, more DB load)
+  max_cache: 50_000,  # Cache up to 50k scheduled jobs
+  enable_listen_notify: true,  # Enable for low-latency job pickup
+  enable_cron: true,  # Enable if using cron jobs
+  
+  # Database timeouts (prevent long-running queries)
+  database_statement_timeout: 30_000,  # 30 seconds
+  database_lock_timeout: 5_000,  # 5 seconds
+  
+  # Cleanup configuration
+  preserve_job_records: false,  # Set to false to enable automatic cleanup
+  cleanup_interval_seconds: 600,  # Run cleanup every 10 minutes
+  cleanup_interval_jobs: 1_000,  # Process 1000 jobs per cleanup run
+  cleanup_discarded_jobs: true,  # Automatically destroy discarded jobs
+  cleanup_preserved_jobs_before_seconds_ago: 1_209_600,  # 14 days
+  
+  # Shutdown configuration
+  shutdown_timeout: 30,  # Wait 30 seconds for graceful shutdown
+  
+  # LISTEN/NOTIFY configuration
+  notifier_pool_size: 1,  # Single dedicated connection
+  notifier_channel: "good_job",
+  notifier_wait_interval: 1_000,  # Wait 1 second between NOTIFY checks
+  notifier_keepalive_interval: 10_000,  # Keepalive every 10 seconds
+  
+  # Performance configuration
+  queue_select_limit: 1_000,  # Limit jobs queried before advisory locks (recommended for large queues)
+  
+  # Feature flags
+  enable_pauses: false,  # Enable job pausing (queue/job_class/label)
+  advisory_lock_heartbeat: false,  # Use advisory lock for process heartbeat (true in dev)
+  
+  # Cron configuration (if using cron)
+  cron: %{
+    # Example: Run a job every hour
+    hourly_task: %{
+      cron: "0 * * * *",  # Every hour at minute 0
+      class: MyApp.HourlyTask,
+      args: %{},
+      queue: "ex.default"
+    }
+  }
+
+# Telemetry configuration
+# Attach telemetry handlers in your application.ex:
+# GoodJob.Telemetry.attach_default_logger(level: :info)
+
+# Logging configuration
+config :logger,
+  level: :info,
+  backends: [:console],
+  compile_time_purge_matching: [
+    [level_lower_than: :info]
+  ]
+
+# If using structured logging (e.g., JSON logs)
+# config :logger, :console,
+#   format: "$time $metadata[$level] $message\n",
+#   metadata: [:request_id, :job_id, :queue_name]
+

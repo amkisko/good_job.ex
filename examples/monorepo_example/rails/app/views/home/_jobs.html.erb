@@ -1,0 +1,34 @@
+<div class="section">
+  <h2>Recent Jobs</h2>
+  <% if jobs && !jobs.empty? %>
+    <table class="jobs-table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Job Class</th>
+          <th>Queue</th>
+          <th>Status</th>
+          <th>Created At</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% jobs.each do |job| %>
+          <tr>
+            <td><%= job.id %></td>
+            <td><%= job.job_class || job.serialized_params&.dig("job_class") || "N/A" %></td>
+            <td><%= job.queue_name %></td>
+            <td>
+              <span class="badge badge-<%= job.status %>">
+                <%= job.status.to_s.capitalize %>
+              </span>
+            </td>
+            <td><%= job.created_at.strftime("%Y-%m-%d %H:%M:%S") %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  <% else %>
+    <p>No jobs found. Enqueue a job to get started!</p>
+  <% end %>
+</div>
+

@@ -1,0 +1,126 @@
+@import "tailwindcss";
+
+/* Apple HIG: Responsive Typography Scale */
+:root {
+  --font-size-xs: clamp(0.75rem, 0.7rem + 0.25vw, 0.875rem);
+  --font-size-sm: clamp(0.875rem, 0.8rem + 0.375vw, 1rem);
+  --font-size-base: clamp(1rem, 0.95rem + 0.25vw, 1.125rem);
+  --font-size-lg: clamp(1.125rem, 1rem + 0.625vw, 1.5rem);
+  --font-size-xl: clamp(1.25rem, 1.1rem + 0.75vw, 2rem);
+  --font-size-2xl: clamp(1.5rem, 1.3rem + 1vw, 2.5rem);
+  --font-size-3xl: clamp(1.875rem, 1.5rem + 1.875vw, 3rem);
+  
+  /* Apple HIG: Spacing System (8pt grid) */
+  --spacing-1: 0.25rem;  /* 4pt */
+  --spacing-2: 0.5rem;   /* 8pt */
+  --spacing-3: 0.75rem; /* 12pt */
+  --spacing-4: 1rem;    /* 16pt */
+  --spacing-5: 1.25rem; /* 20pt */
+  --spacing-6: 1.5rem;  /* 24pt */
+  --spacing-8: 2rem;    /* 32pt */
+  --spacing-10: 2.5rem; /* 40pt */
+  --spacing-12: 3rem;   /* 48pt */
+  
+  /* Apple HIG: Touch Target Minimum */
+  --touch-target-min: 44px;
+}
+
+/* Responsive container padding */
+.container-responsive {
+  padding-left: max(1rem, env(safe-area-inset-left));
+  padding-right: max(1rem, env(safe-area-inset-right));
+}
+
+/* Apple HIG: Card shadows and elevation */
+.card-elevation-1 {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24);
+}
+
+.card-elevation-2 {
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.16), 0 3px 6px rgba(0, 0, 0, 0.23);
+}
+
+.card-elevation-3 {
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.19), 0 6px 6px rgba(0, 0, 0, 0.23);
+}
+
+/* Apple HIG: Button press states */
+.button-press {
+  transition: transform 0.1s cubic-bezier(0.4, 0.0, 0.2, 1);
+}
+
+.button-press:active {
+  transform: scale(0.95);
+}
+
+/* Responsive grid utilities */
+.grid-responsive {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--spacing-4);
+}
+
+@media (min-width: 640px) {
+  .grid-responsive {
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--spacing-6);
+  }
+}
+
+@media (min-width: 1024px) {
+  .grid-responsive {
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--spacing-8);
+  }
+}
+
+@media (min-width: 1280px) {
+  .grid-responsive {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+/* Apple HIG: Text truncation */
+.text-truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.text-truncate-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.text-truncate-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Apple HIG: Smooth transitions */
+.transition-smooth {
+  transition: all 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
+}
+
+/* Apple HIG: Backdrop blur (iOS style) */
+.backdrop-blur {
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+}
+
+/* Responsive table wrapper */
+.table-responsive {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 768px) {
+  .table-responsive table {
+    min-width: 600px;
+  }
+}
+

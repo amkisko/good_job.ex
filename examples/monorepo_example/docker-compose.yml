@@ -1,0 +1,91 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: monorepo_example_development
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  rails:
+    build:
+      context: ./rails
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_USER: postgres
+      DATABASE_PASSWORD: postgres
+      RAILS_ENV: development
+      RAILS_MAX_THREADS: 5
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./rails:/app
+      - rails_bundle:/usr/local/bundle
+    command: bundle exec rails server -b 0.0.0.0
+
+  rails_worker:
+    build:
+      context: ./rails
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_USER: postgres
+      DATABASE_PASSWORD: postgres
+      RAILS_ENV: development
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rails:
+        condition: service_started
+    volumes:
+      - ./rails:/app
+      - rails_bundle:/usr/local/bundle
+    command: bundle exec good_job start
+
+  elixir_worker:
+    build:
+      context: ./elixir
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_USER: postgres
+      DATABASE_PASSWORD: postgres
+      DATABASE_NAME: monorepo_example_development
+      MIX_ENV: dev
+      GOOD_JOB_PATH: /good_job.ex
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rails:
+        condition: service_started
+    volumes:
+      - ./elixir:/app
+      - ../../../:/good_job.ex
+      - elixir_deps:/app/deps
+      - elixir_build:/app/_build
+    working_dir: /app
+    command: sh -c "cd /app && mix deps.get && mix run --no-halt"
+
+volumes:
+  postgres_data:
+  rails_bundle:
+  elixir_deps:
+  elixir_build:
+

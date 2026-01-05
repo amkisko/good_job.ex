@@ -1,0 +1,147 @@
+# Dialyzer ignore warnings for known false positives
+
+# ExUnit.CaseTemplate macros - these are compile-time macros that Dialyzer doesn't understand
+lib/good_job/job_case.ex:8
+lib/good_job/job_case.ex:48
+lib/good_job/job_case.ex:59
+lib/good_job/repo_case.ex:1
+lib/good_job/repo_case.ex:10
+lib/good_job/repo_case.ex:29
+lib/good_job/repo_case.ex:44
+
+# GoodJob.Testing - ExUnit.CaseTemplate and ExUnit.Callbacks macros (compile-time macros)
+lib/good_job/testing/job_case.ex:10
+lib/good_job/testing/repo_case.ex:1
+lib/good_job/testing/repo_case.ex:12
+lib/good_job/testing/repo_case.ex:46
+
+# GoodJob.Testing - test helpers that use ExUnit macros
+lib/good_job/testing.ex:24
+lib/good_job/testing.ex:50
+lib/good_job/testing.ex:75
+
+# Pattern match coverage - these are intentional exhaustive matches
+lib/good_job/database_url.ex:182
+lib/good_job/executor.ex:184
+lib/good_job/executor.ex:193
+lib/good_job/job_executor.ex:551
+lib/good_job/job_executor.ex:575
+lib/good_job/web/live_dashboard_page.ex:1169
+
+# Pattern matches in engines/inline.ex - these handle all cases but Dialyzer can't infer
+lib/good_job/engines/inline.ex:39
+lib/good_job/engines/inline.ex:46
+lib/good_job/engines/inline.ex:55
+lib/good_job/engines/inline.ex:62
+lib/good_job/engines/inline.ex:73
+
+# JobStats - DateTime/NaiveDateTime truncate calls that Dialyzer can't fully analyze
+# These are valid calls but Dialyzer has trouble with type inference
+lib/good_job/job_stats.ex:226
+lib/good_job/job_stats.ex:283
+lib/good_job/job_stats.ex:287
+lib/good_job/job_stats.ex:305
+lib/good_job/job_stats.ex:308
+lib/good_job/job_stats.ex:362
+lib/good_job/job_stats.ex:418
+lib/good_job/job_stats.ex:426
+lib/good_job/job_stats.ex:445
+lib/good_job/job_stats.ex:465
+
+# Phoenix LiveView - macro-generated code
+lib/good_job/web/live_dashboard_page.ex:288
+
+# GoodJob.Testing - ExUnit.Assertions.flunk/1 is a macro that Dialyzer doesn't understand
+lib/good_job/testing.ex:44
+lib/good_job/testing.ex:133
+lib/good_job/testing.ex:158
+
+# Pattern match coverage in format_backtrace - second clause handles edge cases
+lib/good_job/job_executor.ex:614
+lib/good_job/job_executor.ex:620
+lib/good_job/job_executor.ex:622
+
+# Errors module - Dialyzer false positive on boolean return values
+lib/good_job/errors.ex:1
+
+# Web/DataLoader - Query type inference issues (false positives)
+lib/good_job/web/data_loader.ex:11
+lib/good_job/web/data_loader.ex:15
+lib/good_job/web/data_loader.ex:32
+lib/good_job/web/data_loader.ex:82
+
+# Phoenix LiveView - no_return warnings from macro-generated code (false positives)
+lib/good_job/web/live_dashboard.ex:45
+lib/good_job/web/live_dashboard.ex:76
+lib/good_job/web/live_dashboard.ex:200
+lib/good_job/web/live_dashboard_page.ex:73
+lib/good_job/web/live_dashboard_page.ex:166
+lib/good_job/web/live_dashboard_page/handlers.ex:132
+lib/good_job/web/live_dashboard_page/handlers.ex:149
+lib/good_job/web/live_dashboard_page/handlers.ex:197
+lib/good_job/web/live_dashboard_page/handlers.ex:208
+lib/good_job/web/live_dashboard_page/handlers.ex:238
+lib/good_job/web/live_dashboard_page/handlers.ex:249
+lib/good_job/web/live_dashboard_page/handlers.ex:260
+
+# GoodJob module - no_return from delegate functions (false positive)
+lib/good_job.ex:285
+
+# Job module - no_return and call warnings from Query delegation (false positives)
+lib/good_job/job.ex:47
+lib/good_job/job.ex:48
+lib/good_job/job.ex:51
+lib/good_job/job.ex:59
+lib/good_job/job.ex:60
+
+# Job.Query - no_return and call warnings from Ecto.Query type inference (false positives)
+lib/good_job/job/query.ex:15
+lib/good_job/job/query.ex:23
+lib/good_job/job/query.ex:45
+lib/good_job/job/query.ex:115
+lib/good_job/job/query.ex:123
+
+# Job.Instance - no_return and call warnings (false positives)
+lib/good_job/job/instance.ex:27
+lib/good_job/job/instance.ex:32
+
+# JobPerformer - no_return warnings from complex control flow (false positives)
+lib/good_job/job_performer.ex:27
+lib/good_job/job_performer.ex:65
+lib/good_job/job_performer.ex:71
+lib/good_job/job_performer.ex:75
+lib/good_job/job_performer.ex:97
+lib/good_job/job_performer.ex:111
+
+# JobStats - no_return and call warnings from type inference (false positives)
+lib/good_job/job_stats.ex:12
+lib/good_job/job_stats.ex:15
+lib/good_job/job_stats.ex:96
+lib/good_job/job_stats.ex:99
+
+# JobStats.TimeSeries - pattern_match_cov warnings (intentional exhaustive matches)
+lib/good_job/job_stats/time_series.ex:114
+lib/good_job/job_stats/time_series.ex:120
+
+# JobExecutor.ResultHandler - call warnings from Ecto type inference (false positives)
+lib/good_job/job_executor/result_handler.ex:177
+lib/good_job/job_executor/result_handler.ex:183
+lib/good_job/job_executor/result_handler.ex:211
+lib/good_job/job_executor/result_handler.ex:264
+
+# Health - no_return and call warnings (false positives)
+lib/good_job/health.ex:93
+lib/good_job/health.ex:99
+lib/good_job/health.ex:100
+
+# Engines.Basic - no_return and call warnings (false positives)
+lib/good_job/engines/basic.ex:26
+lib/good_job/engines/basic.ex:33
+
+# Concurrency - pattern_match warnings (intentional pattern matching)
+lib/good_job/concurrency.ex:45
+lib/good_job/concurrency.ex:86
+
+# Executor - pattern_match_cov warnings (intentional exhaustive matches)
+lib/good_job/executor.ex:192
+

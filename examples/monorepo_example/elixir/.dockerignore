@@ -1,0 +1,9 @@
+_build/*
+deps/*
+.git
+.gitignore
+.env
+.env.local
+*.md
+erl_crash.dump
+

@@ -1,0 +1,18 @@
+# Rails API server
+rails: cd rails && bundle exec rails server -p 3000
+
+# Rails Tailwind CSS watcher
+rails_tailwind: cd rails && bin/rails tailwindcss:watch
+
+# Rails GoodJob worker (processes rb.default queue)
+rails_worker: cd rails && bundle exec good_job start
+
+# Elixir GoodJob worker (processes ex.default queue)
+elixir_worker: cd elixir && mix run --no-halt
+
+# Elixir Phoenix web server (for web interface)
+elixir_web: cd elixir && mix phx.server
+
+# Zig GoodJob worker (processes zig.default queue)
+# Uses the original zig_worker from good_job.zig/examples/monorepo_example/zig_worker
+# zig_worker: cd ../../../good_job.zig/examples/monorepo_example/zig_worker && zig build run

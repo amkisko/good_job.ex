@@ -1,0 +1,21 @@
+# Rails
+rails/log/*
+rails/tmp/*
+rails/.bundle
+rails/vendor/bundle
+
+# Elixir
+elixir/_build/
+elixir/deps/
+elixir/.fetch
+elixir/erl_crash.dump
+elixir/*.ez
+
+# Database
+*.sqlite3
+*.sqlite3-journal
+
+# Environment
+.env
+.env.local
+

@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, user-scalable=yes, viewport-fit=cover" />
+    <meta name="csrf-token" content={get_csrf_token()} />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="theme-color" content="#ff9a9e" />
+    <.live_title suffix=" · My Habit Garden">
+      My Habit Garden
+    </.live_title>
+    <link phx-track-static rel="stylesheet" href={~p"/assets/css/app.css"} />
+    <script defer phx-track-static type="text/javascript" src={~p"/assets/js/app.js"}></script>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Comic+Neue:wght@300;400;700&display=swap');
+      
+      /* Apple HIG: System font stack with fallbacks */
+      body { 
+        font-family: -apple-system, BlinkMacSystemFont, 'Comic Neue', 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+      
+      /* Safe area support for notched devices */
+      @supports (padding: max(0px)) {
+        body {
+          padding-left: env(safe-area-inset-left);
+          padding-right: env(safe-area-inset-right);
+        }
+        header {
+          padding-top: env(safe-area-inset-top);
+        }
+      }
+      
+      /* Animations - Apple HIG: Subtle and purposeful */
+      @keyframes bounce { 
+        0%, 100% { transform: translateY(0); } 
+        50% { transform: translateY(-8px); } 
+      }
+      @keyframes wiggle { 
+        0%, 100% { transform: rotate(0deg); } 
+        25% { transform: rotate(-3deg); } 
+        75% { transform: rotate(3deg); } 
+      }
+      @keyframes pulse-glow {
+        0%, 100% { box-shadow: 0 0 0 0 rgba(255, 107, 157, 0.4); }
+        50% { box-shadow: 0 0 20px 5px rgba(255, 107, 157, 0.6); }
+      }
+      @keyframes slide-in {
+        from { transform: translateX(-100%); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+      }
+      @keyframes fade-in {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+      @keyframes rotate-hamburger {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(90deg); }
+      }
+      
+      .cat-emoji { 
+        animation: bounce 2s ease-in-out infinite; 
+        display: inline-block; 
+      }
+      .flower-emoji { 
+        animation: wiggle 3s ease-in-out infinite; 
+        display: inline-block; 
+      }
+      
+      /* Apple HIG: Touch targets minimum 44x44pt */
+      button, a.button, .touch-target {
+        min-height: 44px;
+        min-width: 44px;
+      }
+      
+      /* Navigation link styles */
+      .nav-link {
+        position: relative;
+        transition: all 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
+        transform-origin: center;
+      }
+      .nav-link:hover {
+        transform: scale(1.05) translateY(-2px);
+      }
+      .nav-link:active {
+        transform: scale(0.95);
+      }
+      .nav-link.active {
+        animation: pulse-glow 2s ease-in-out infinite;
+        transform: scale(1.1);
+        box-shadow: 0 0 20px 8px rgba(255, 107, 157, 0.5), 0 2px 8px rgba(0,0,0,0.1) !important;
+        border: 2px solid rgba(255, 107, 157, 0.8);
+      }
+      
+      /* Mobile menu styles */
+      .mobile-menu-backdrop {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.3);
+        backdrop-filter: blur(4px);
+        z-index: 9998;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.3s ease;
+      }
+      .mobile-menu-backdrop.open {
+        opacity: 1;
+        pointer-events: all;
+      }
+      
+      .mobile-menu {
+        position: fixed;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        width: min(85vw, 320px);
+        background: linear-gradient(180deg, #fff5f8 0%, #ffe5f1 50%, #fef3e2 100%);
+        z-index: 9999;
+        transform: translateX(-100%);
+        transition: transform 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
+        box-shadow: 4px 0 20px rgba(0, 0, 0, 0.15);
+        overflow-y: auto;
+      }
+      .mobile-menu.open {
+        transform: translateX(0);
+      }
+      
+      .mobile-nav-link {
+        position: relative;
+        transition: all 0.2s ease;
+        animation: slide-in 0.3s ease backwards;
+      }
+      .mobile-nav-link:nth-child(1) { animation-delay: 0.05s; }
+      .mobile-nav-link:nth-child(2) { animation-delay: 0.1s; }
+      .mobile-nav-link:nth-child(3) { animation-delay: 0.15s; }
+      .mobile-nav-link:nth-child(4) { animation-delay: 0.2s; }
+      .mobile-nav-link:hover {
+        transform: translateX(8px) scale(1.02);
+      }
+      .mobile-nav-link:active {
+        transform: translateX(4px) scale(0.98);
+      }
+      .mobile-nav-link.active {
+        transform: translateX(12px);
+        box-shadow: 0 0 20px 8px rgba(255, 107, 157, 0.5), 0 4px 12px rgba(0, 0, 0, 0.2) !important;
+        border: 2px solid rgba(255, 107, 157, 0.8);
+        animation: pulse-glow 2s ease-in-out infinite;
+      }
+      .mobile-nav-link.active::before {
+        content: '✨';
+        position: absolute;
+        left: -24px;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: 1.2rem;
+        animation: wiggle 1s ease-in-out infinite;
+      }
+      
+      /* Hamburger animation */
+      .hamburger {
+        transition: transform 0.3s ease;
+      }
+      .hamburger.open {
+        transform: rotate(90deg);
+      }
+      
+      /* Smooth scrolling */
+      html {
+        scroll-behavior: smooth;
+      }
+      
+      /* Focus states for accessibility */
+      *:focus-visible {
+        outline: 3px solid #ff6b9d;
+        outline-offset: 3px;
+        border-radius: 8px;
+      }
+      
+      /* Header backdrop blur */
+      header {
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+      }
+    </style>
+  </head>
+  <body class="h-full" style="background: linear-gradient(135deg, #fef3e2 0%, #ffe5f1 50%, #e8f5e9 100%); min-height: 100vh;">
+    <header class="shadow-lg sticky top-0" style="background: linear-gradient(135deg, rgba(255, 154, 158, 0.95) 0%, rgba(254, 207, 239, 0.95) 50%, rgba(254, 207, 239, 0.95) 100%); border-bottom: 4px solid #ff6b9d; z-index: 1000;">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex justify-between items-center h-16 sm:h-20">
+          <a href={~p"/"} class="flex items-center space-x-2 sm:space-x-3 hover:opacity-80 transition-opacity">
+            <span class="cat-emoji text-2xl sm:text-4xl">🐱</span>
+            <h1 class="text-xl sm:text-2xl md:text-3xl font-bold" style="background: linear-gradient(135deg, #ff6b9d 0%, #c44569 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">
+              My Habit Garden
+            </h1>
+            <span class="flower-emoji text-xl sm:text-2xl hidden sm:inline">🌸</span>
+          </a>
+          
+          <!-- Desktop Navigation -->
+          <nav class="hidden md:flex md:space-x-3 lg:space-x-4 items-center">
+            <.link navigate={~p"/"} class="nav-link px-4 lg:px-5 py-2.5 rounded-full text-sm lg:text-base font-bold transition-all touch-target" data-route="/" style="background: rgba(255,255,255,0.9); color: #c44569; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+              <span class="text-lg">🏠</span> <span class="ml-1.5">Home</span>
+            </.link>
+            <.link navigate={~p"/habits"} class="nav-link px-4 lg:px-5 py-2.5 rounded-full text-sm lg:text-base font-bold transition-all touch-target" data-route="/habits" style="background: rgba(255,255,255,0.9); color: #c44569; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+              <span class="text-lg">🌟</span> <span class="ml-1.5">Habits</span>
+            </.link>
+            <.link navigate={~p"/analytics"} class="nav-link px-4 lg:px-5 py-2.5 rounded-full text-sm lg:text-base font-bold transition-all touch-target" data-route="/analytics" style="background: rgba(255,255,255,0.9); color: #c44569; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+              <span class="text-lg">📊</span> <span class="ml-1.5">Stats</span>
+            </.link>
+            <.link navigate={~p"/jobs"} class="nav-link px-4 lg:px-5 py-2.5 rounded-full text-sm lg:text-base font-bold transition-all touch-target" data-route="/jobs" style="background: rgba(255,255,255,0.9); color: #c44569; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+              <span class="text-lg">⚙️</span> <span class="ml-1.5">Jobs</span>
+            </.link>
+          </nav>
+          
+          <!-- Mobile Menu Button -->
+          <button 
+            id="mobile-menu-button"
+            class="md:hidden p-3 rounded-full touch-target hamburger" 
+            style="background: rgba(255,255,255,0.9); color: #c44569; box-shadow: 0 2px 8px rgba(0,0,0,0.1);"
+            aria-label="Toggle menu"
+            aria-expanded="false"
+          >
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+              <path id="hamburger-top" stroke-linecap="round" stroke-linejoin="round" d="M4 6h16" />
+              <path id="hamburger-middle" stroke-linecap="round" stroke-linejoin="round" d="M4 12h16" />
+              <path id="hamburger-bottom" stroke-linecap="round" stroke-linejoin="round" d="M4 18h16" />
+            </svg>
+          </button>
+        </div>
+      </div>
+      
+      <!-- Mobile Menu Backdrop -->
+      <div id="mobile-menu-backdrop" class="mobile-menu-backdrop"></div>
+      
+      <!-- Mobile Navigation Menu -->
+      <div id="mobile-menu" class="mobile-menu">
+        <div class="p-6">
+          <div class="flex items-center justify-between mb-8">
+            <h2 class="text-2xl font-bold" style="background: linear-gradient(135deg, #ff6b9d 0%, #c44569 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">
+              🌸 Menu
+            </h2>
+            <button 
+              id="mobile-menu-close"
+              class="p-2 rounded-full touch-target"
+              style="background: rgba(255,255,255,0.8); color: #c44569;"
+              aria-label="Close menu"
+            >
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          <nav class="flex flex-col space-y-3">
+            <.link navigate={~p"/"} class="mobile-nav-link px-5 py-4 rounded-2xl text-lg font-bold transition-all touch-target" data-route="/" style="background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%); color: white; box-shadow: 0 4px 12px rgba(255, 107, 157, 0.3);">
+              <span class="text-2xl">🏠</span> <span class="ml-3">Home Sweet Home</span>
+            </.link>
+            <.link navigate={~p"/habits"} class="mobile-nav-link px-5 py-4 rounded-2xl text-lg font-bold transition-all touch-target" data-route="/habits" style="background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); color: #2d1b2e; box-shadow: 0 4px 12px rgba(168, 237, 234, 0.3);">
+              <span class="text-2xl">🌟</span> <span class="ml-3">My Amazing Habits</span>
+            </.link>
+            <.link navigate={~p"/analytics"} class="mobile-nav-link px-5 py-4 rounded-2xl text-lg font-bold transition-all touch-target" data-route="/analytics" style="background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%); color: #2d1b2e; box-shadow: 0 4px 12px rgba(255, 236, 210, 0.3);">
+              <span class="text-2xl">📊</span> <span class="ml-3">Super Stats</span>
+            </.link>
+            <.link navigate={~p"/jobs"} class="mobile-nav-link px-5 py-4 rounded-2xl text-lg font-bold transition-all touch-target" data-route="/jobs" style="background: linear-gradient(135deg, #ffecd2 0%, #ffd89b 100%); color: #2d1b2e; box-shadow: 0 4px 12px rgba(255, 236, 210, 0.3);">
+              <span class="text-2xl">⚙️</span> <span class="ml-3">Helper Jobs</span>
+            </.link>
+          </nav>
+        </div>
+      </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto py-4 sm:py-6 lg:py-8 px-4 sm:px-6 lg:px-8" style="padding-bottom: max(2rem, env(safe-area-inset-bottom));">
+      <.flash_group flash={@flash} />
+      <%= @inner_content %>
+    </main>
+    
+    <script>
+      // Active route highlighting
+      function updateActiveRoute() {
+        const currentPath = window.location.pathname;
+        const navLinks = document.querySelectorAll('.nav-link, .mobile-nav-link');
+        
+        navLinks.forEach(link => {
+          const route = link.getAttribute('data-route');
+          if (route && (currentPath === route || (route === '/' && currentPath === '/'))) {
+            link.classList.add('active');
+          } else {
+            link.classList.remove('active');
+          }
+        });
+      }
+      
+      // Mobile menu toggle
+      function initMobileMenu() {
+        const menuButton = document.getElementById('mobile-menu-button');
+        const mobileMenu = document.getElementById('mobile-menu');
+        const backdrop = document.getElementById('mobile-menu-backdrop');
+        const closeButton = document.getElementById('mobile-menu-close');
+        
+        if (!menuButton || !mobileMenu || !backdrop) return;
+        
+        function openMenu() {
+          mobileMenu.classList.add('open');
+          backdrop.classList.add('open');
+          menuButton.classList.add('open');
+          menuButton.setAttribute('aria-expanded', 'true');
+          document.body.style.overflow = 'hidden';
+        }
+        
+        function closeMenu() {
+          mobileMenu.classList.remove('open');
+          backdrop.classList.remove('open');
+          menuButton.classList.remove('open');
+          menuButton.setAttribute('aria-expanded', 'false');
+          document.body.style.overflow = '';
+        }
+        
+        menuButton.addEventListener('click', openMenu);
+        if (closeButton) closeButton.addEventListener('click', closeMenu);
+        backdrop.addEventListener('click', closeMenu);
+        
+        // Close menu when clicking nav links
+        mobileMenu.querySelectorAll('a').forEach(link => {
+          link.addEventListener('click', () => {
+            setTimeout(closeMenu, 100); // Small delay for smooth transition
+          });
+        });
+        
+        // Close menu on escape key
+        document.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape' && mobileMenu.classList.contains('open')) {
+            closeMenu();
+          }
+        });
+      }
+      
+      // Initialize on page load
+      document.addEventListener('DOMContentLoaded', function() {
+        updateActiveRoute();
+        initMobileMenu();
+        
+        // Update active route on navigation (for LiveView)
+        document.addEventListener('phx:page-loading-stop', updateActiveRoute);
+      });
+      
+      // Also update on LiveView navigation
+      window.addEventListener('phx:navigate', updateActiveRoute);
+    </script>
+  </body>
+</html>
