@@ -74,6 +74,11 @@ defmodule GoodJob.ExternalJobTest do
       use ExternalJob, queue: "validated"
 
       # Override with pattern matching for argument validation
+      # Explicitly handle perform_later/0 to provide a clear error message
+      def perform_later do
+        raise ArgumentError, "perform_later/1 requires user_id and amount keys"
+      end
+
       def perform_later(%{user_id: user_id, amount: amount}) when is_integer(user_id) and is_float(amount) do
         super(%{user_id: user_id, amount: amount})
       end
