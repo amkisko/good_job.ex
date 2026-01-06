@@ -23,28 +23,10 @@ defmodule GoodJob.Web.LiveDashboardPage do
   # Increased to 30s since PubSub handles real-time updates
 
   @doc """
-  Returns the path to the bundled ECharts JavaScript file.
-  Falls back to CDN if static file is not available.
-
-  For standalone use, configure Plug.Static in your endpoint to serve files from :good_job:
-
-      plug Plug.Static,
-        at: "/good_job/static",
-        from: {:good_job, "priv/static"},
-        gzip: true
+  Returns the CDN URL for the ECharts JavaScript file.
   """
   def echarts_js_path do
-    # Try to use bundled version from priv/static
-    path = Application.app_dir(:good_job, "priv/static/js/echarts.min.js")
-
-    if File.exists?(path) do
-      # Return a path that can be served via Plug.Static
-      # Users need to configure Plug.Static to serve from :good_job's priv/static
-      "/good_job/static/js/echarts.min.js"
-    else
-      # Fallback to CDN
-      "https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"
-    end
+    "https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"
   end
 
   @doc """
