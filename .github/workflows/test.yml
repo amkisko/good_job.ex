@@ -26,6 +26,7 @@ jobs:
       DATABASE_URL: postgres://postgres:postgres@localhost:5432/good_job_test
       ELIXIR_VERSION: "1.18"
       OTP_VERSION: "27"
+      MIX_ENV: test
     steps:
       - uses: actions/checkout@v6
       - uses: erlef/setup-beam@v1
@@ -49,7 +50,7 @@ jobs:
       - run: mix deps.get
       - run: mix deps.compile
       - run: mix test.setup
-      - run: MIX_ENV=test mix coveralls.json
+      - run: mix coveralls.json
       - uses: codecov/codecov-action@v5
         with:
           files: ./cover/excoveralls.json
