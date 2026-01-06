@@ -94,9 +94,7 @@ defmodule GoodJob.MixProject do
 
   defp description do
     """
-    A concurrent, Postgres-based job queue backend for Elixir.
-    Inspired by Ruby's GoodJob, designed for maximum compatibility with PostgreSQL
-    and Elixir/OTP best practices.
+    A concurrent, Postgres-based job queue backend for Elixir. Fully compatible with original GoodJob and Rails ActiveJob.
     """
   end
 
