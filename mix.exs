@@ -87,7 +87,7 @@ defmodule GoodJob.MixProject do
       },
       files: ~w(
         lib mix.exs README.md CHANGELOG.md LICENSE.md .formatter.exs
-        priv/migrations priv/static
+        priv/migrations
       )
     ]
   end
