@@ -59,7 +59,7 @@ defmodule GoodJob.MixProject do
 
       # Phoenix dependencies (optional, for Phoenix integration)
       {:phoenix, "~> 1.7", optional: true},
-      {:phoenix_live_view, "~> 0.20", optional: true},
+      {:phoenix_live_view, "~> 1.1", optional: true},
       {:phoenix_html, "~> 4.0", optional: true},
       {:plug, "~> 1.14", optional: true},
       {:plug_cowboy, "~> 2.6", optional: true},
