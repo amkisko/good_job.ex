@@ -6,35 +6,6 @@ on:
     branches: [main]
 
 jobs:
-  mix-test:
-    runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:15
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: good_job_test
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432:5432
-    env:
-      DATABASE_URL: postgres://postgres:postgres@localhost:5432/good_job_test
-    steps:
-      - uses: actions/checkout@v6
-      - uses: erlef/setup-beam@v1
-        with:
-          elixir-version: "1.18"
-          otp-version: "27"
-      - run: mix deps.get
-      - run: mix deps.compile
-      - run: mix test.setup
-      - run: mix test.ci
-
   coverage:
     runs-on: ubuntu-latest
     services:
@@ -53,12 +24,28 @@ jobs:
           - 5432:5432
     env:
       DATABASE_URL: postgres://postgres:postgres@localhost:5432/good_job_test
+      ELIXIR_VERSION: "1.18"
+      OTP_VERSION: "27"
     steps:
       - uses: actions/checkout@v6
       - uses: erlef/setup-beam@v1
         with:
-          elixir-version: "1.18"
-          otp-version: "27"
+          elixir-version: ${{ env.ELIXIR_VERSION }}
+          otp-version: ${{ env.OTP_VERSION }}
+      - name: Restore Mix/Hex/Rebar cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            deps
+            _build
+            ~/.mix
+            ~/.hex
+            ~/.cache/rebar3
+          key: ${{ runner.os }}-beam-${{ env.OTP_VERSION }}-ex${{ env.ELIXIR_VERSION }}-mix-${{ hashFiles('**/mix.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-beam-${{ env.OTP_VERSION }}-ex${{ env.ELIXIR_VERSION }}-mix-
+            ${{ runner.os }}-beam-${{ env.OTP_VERSION }}-ex${{ env.ELIXIR_VERSION }}-
+            ${{ runner.os }}-beam-
       - run: mix deps.get
       - run: mix deps.compile
       - run: mix test.setup
@@ -69,4 +56,3 @@ jobs:
           flags: unittests
           name: codecov-umbrella
           fail_ci_if_error: false
-
