@@ -6,8 +6,40 @@ database_url =
     System.get_env("DATABASE_URL") ||
     "postgres://postgres:postgres@localhost/good_job_test"
 
-# Parse database URL and configure repo
-config_params = GoodJob.DatabaseURL.parse(database_url)
+# Parse database URL manually (can't use GoodJob.DatabaseURL.parse at compile time)
+uri = URI.parse(database_url)
+
+# Extract database name from path
+database =
+  case uri.path do
+    "/" <> db -> db
+    path when is_binary(path) -> String.trim_leading(path, "/")
+    _ -> nil
+  end
+
+# Extract username and password
+{username, password} =
+  case uri.userinfo do
+    nil ->
+      {nil, nil}
+
+    userinfo ->
+      case String.split(userinfo, ":", parts: 2) do
+        [user, pass] -> {user, pass}
+        [user] -> {user, nil}
+        _ -> {nil, nil}
+      end
+  end
+
+# Build config keyword list
+config_params = [
+  username: username,
+  password: password,
+  hostname: uri.host || "localhost",
+  port: uri.port || 5432,
+  database: database,
+  adapter: Ecto.Adapters.Postgres
+]
 
 # Configure Ecto repos
 config :good_job, ecto_repos: [GoodJob.TestRepo]

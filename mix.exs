@@ -179,8 +179,8 @@ defmodule GoodJob.MixProject do
         "test --raise",
         "dialyzer"
       ],
-      "test.setup": ["ecto.create --quiet", "ecto.migrate --quiet"],
-      "test.reset": ["ecto.drop --quiet", "test.setup"],
+      "test.setup": ["ecto.create -r GoodJob.TestRepo --quiet", "ecto.migrate -r GoodJob.TestRepo --quiet"],
+      "test.reset": ["ecto.drop -r GoodJob.TestRepo --quiet", "test.setup"],
       release: fn _ -> run_script("usr/bin/release.exs") end,
       analyze: fn _ -> run_script("usr/bin/analyze.exs") end
     ]

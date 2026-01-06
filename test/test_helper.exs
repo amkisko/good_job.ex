@@ -51,12 +51,22 @@ Application.put_env(:good_job, :config, %{
   enable_listen_notify: true
 })
 
-# Start the test repo
-{:ok, _} = GoodJob.TestRepo.start_link()
+# Start the test repo (handle already started case)
+case GoodJob.TestRepo.start_link() do
+  {:ok, _} -> :ok
+  {:error, {:already_started, _}} -> :ok
+end
 
 # Start minimal GoodJob processes needed for testing
-{:ok, _} = Registry.start_link(keys: :unique, name: GoodJob.Registry)
-{:ok, _} = GoodJob.ProcessTracker.start_link([])
+case Registry.start_link(keys: :unique, name: GoodJob.Registry) do
+  {:ok, _} -> :ok
+  {:error, {:already_started, _}} -> :ok
+end
+
+case GoodJob.ProcessTracker.start_link([]) do
+  {:ok, _} -> :ok
+  {:error, {:already_started, _}} -> :ok
+end
 
 # Start Ecto repos for testing
 Ecto.Adapters.SQL.Sandbox.mode(GoodJob.TestRepo, :manual)
