@@ -9,6 +9,9 @@ database_url =
 # Parse database URL and configure repo
 config_params = GoodJob.DatabaseURL.parse(database_url)
 
+# Configure Ecto repos
+config :good_job, ecto_repos: [GoodJob.TestRepo]
+
 # Configure GoodJob test repository
 config :good_job,
        GoodJob.TestRepo,
@@ -16,7 +19,9 @@ config :good_job,
          pool: Ecto.Adapters.SQL.Sandbox,
          pool_size: 10,
          # Disable Ecto query logging in tests
-         log: false
+         log: false,
+         # Tell Ecto where to find migrations
+         priv: "priv"
        )
 
 # Configure GoodJob
