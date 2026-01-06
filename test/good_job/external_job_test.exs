@@ -74,8 +74,8 @@ defmodule GoodJob.ExternalJobTest do
       use ExternalJob, queue: "validated"
 
       # Override with pattern matching for argument validation
-      # Explicitly handle perform_later/0 to provide a clear error message
-      def perform_later do
+      # Handle empty map case explicitly
+      def perform_later(%{} = args) when map_size(args) == 0 do
         raise ArgumentError, "perform_later/1 requires user_id and amount keys"
       end
 
