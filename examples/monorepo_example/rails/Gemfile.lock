@@ -1,7 +1,7 @@
 GEM
   remote: https://rubygems.org/
   specs:
-    action_text-trix (2.1.15)
+    action_text-trix (2.1.16)
       railties
     actioncable (8.1.1)
       actionpack (= 8.1.1)
@@ -128,7 +128,7 @@ GEM
     marcel (1.1.0)
     method_source (1.1.0)
     mini_mime (1.1.5)
-    minitest (6.0.0)
+    minitest (6.0.1)
       prism (~> 1.5)
     msgpack (1.8.0)
     net-imap (0.6.2)
@@ -141,9 +141,12 @@ GEM
     net-smtp (0.5.1)
       net-protocol
     nio4r (2.7.5)
-    nokogiri (1.18.10-arm64-darwin)
+    nokogiri (1.19.0-arm64-darwin)
+      racc (~> 1.4)
+    nokogiri (1.19.0-x86_64-linux-gnu)
       racc (~> 1.4)
     pg (1.6.2-arm64-darwin)
+    pg (1.6.2-x86_64-linux)
     phlex (2.3.1)
       zeitwerk (~> 2.7)
     phlex-rails (2.3.1)
@@ -235,6 +238,8 @@ GEM
     style_capsule (1.4.0)
     tailwindcss-rails (2.7.9-arm64-darwin)
       railties (>= 7.0.0)
+    tailwindcss-rails (2.7.9-x86_64-linux)
+      railties (>= 7.0.0)
     thor (1.4.0)
     timeout (0.6.0)
     tsort (0.2.0)
@@ -253,6 +258,7 @@ GEM
 
 PLATFORMS
   arm64-darwin-24
+  x86_64-linux
 
 DEPENDENCIES
   bootsnap (>= 1.4.4)
