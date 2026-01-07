@@ -26,6 +26,7 @@ Concurrent, Postgres-based job queue backend for Elixir. Provides attribute-base
 - **Concurrency Controls** - Per-key concurrency limits and throttling
 - **Retry Mechanisms** - Automatic retries with exponential backoff
 - **Plugins System** - Extensible plugin architecture for custom functionality
+- **Labels/Tags** - Tag jobs for filtering and analytics
 - **Web Dashboard** - Phoenix LiveView dashboard for monitoring and management
 - **Ruby-Compatible** - Fully aligned with Ruby GoodJob configuration and database schema
 - **Comprehensive Instrumentation** - Telemetry events for monitoring and metrics
@@ -38,7 +39,7 @@ Add `good_job` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:good_job, "~> 0.1.0"}
+    {:good_job, "~> 0.1.1"}
   ]
 end
 ```
@@ -123,6 +124,19 @@ end
 MyApp.EmailJob.enqueue(%{to: "user@example.com", subject: "Hello", body: "World"})
 ```
 
+### Labeled Jobs (Tags)
+
+```elixir
+defmodule MyApp.TaggedJob do
+  use GoodJob.Job, tags: ["billing", "priority"]
+
+  @impl GoodJob.Behaviour
+  def perform(_args), do: :ok
+end
+
+MyApp.TaggedJob.enqueue(%{user_id: 123}, tags: ["vip"])
+```
+
 ### Job with Retries
 
 ```elixir
@@ -188,7 +202,26 @@ defmodule MyApp.UserJob do
   def good_job_concurrency_config do
     [
       key: fn %{user_id: user_id} -> "user_#{user_id}" end,
-      limit: 5
+      limit: 5,
+      perform_throttle: {10, 60} # max 10 executions per 60s for the key
+    ]
+  end
+end
+```
+
+### Throttling Only (No Concurrency Limit)
+
+```elixir
+defmodule MyApp.ThrottledJob do
+  use GoodJob.Job
+
+  @impl GoodJob.Behaviour
+  def perform(_args), do: :ok
+
+  def good_job_concurrency_config do
+    [
+      key: fn _args -> "global" end,
+      enqueue_throttle: {100, 60}
     ]
   end
 end
