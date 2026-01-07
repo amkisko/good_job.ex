@@ -8,7 +8,7 @@ defmodule MonorepoExample.Jobs.GlobalidTestJob do
     case user do
       %{__struct__: :global_id, app: app, model: model, id: id, gid: gid} ->
         Logger.info("GlobalID resolved: app=#{app}, model=#{model}, id=#{id}, gid=#{gid}, message=#{message}")
-        IO.puts("[Elixir Worker] GlobalIDTestJob: app=#{app}, model=#{model}, id=#{id}, message=#{message}")
+        IO.puts("[Elixir Worker] GlobalidTestJob: app=#{app}, model=#{model}, id=#{id}, message=#{message}")
         :ok
 
       other ->

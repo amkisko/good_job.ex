@@ -58,12 +58,12 @@ defmodule MonorepoExampleWeb.JobsController do
   def enqueue(conn, %{"job_type" => "globalid"}) do
     # Test GlobalID resolution - enqueue a job with a GlobalID
     # This simulates what Rails would send
-    case GoodJob.enqueue("GlobalIDTestJob", %{
+    case GoodJob.enqueue("GlobalidTestJob", %{
            user: %{
              "_aj_globalid" => "gid://myapp/User/#{Enum.random(1..100)}"
            },
            message: "GlobalID test from Elixir UI at #{DateTime.utc_now()}"
-         }) do
+         }, queue: "ex.default") do
       {:ok, _job} ->
         conn
         |> put_flash(:info, "GlobalID test job enqueued successfully!")
