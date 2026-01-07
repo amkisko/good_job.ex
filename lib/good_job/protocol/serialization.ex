@@ -213,13 +213,10 @@ defmodule GoodJob.Protocol.Serialization do
   end
 
   defp serialize_arguments(arguments) do
-    # If arguments is not a list (e.g., a map), wrap it in an array
-    # ActiveJob format always uses an array for arguments
     [serialize_argument(arguments)]
   end
 
   defp serialize_argument(arg) when is_atom(arg) do
-    # ActiveJob uses SymbolSerializer for symbols
     %{"_aj_serialized" => "ActiveJob::Serializers::SymbolSerializer", "value" => to_string(arg)}
   end
 
@@ -228,38 +225,28 @@ defmodule GoodJob.Protocol.Serialization do
   defp serialize_argument(arg) when is_boolean(arg), do: arg
   defp serialize_argument(arg) when is_nil(arg), do: nil
 
-  # Handle Date structs - use ActiveJob DateSerializer format
   defp serialize_argument(%Date{} = date) do
     %{"_aj_serialized" => "ActiveJob::Serializers::DateSerializer", "value" => Date.to_iso8601(date)}
   end
 
-  # Handle DateTime structs - use ActiveJob DateTimeSerializer format
   defp serialize_argument(%DateTime{} = dt) do
     %{"_aj_serialized" => "ActiveJob::Serializers::DateTimeSerializer", "value" => DateTime.to_iso8601(dt)}
   end
 
-  # Handle NaiveDateTime structs - convert to DateTime format
   defp serialize_argument(%NaiveDateTime{} = dt) do
-    # Convert NaiveDateTime to DateTime (assume UTC)
     dt_with_zone = DateTime.from_naive!(dt, "Etc/UTC")
     %{"_aj_serialized" => "ActiveJob::Serializers::DateTimeSerializer", "value" => DateTime.to_iso8601(dt_with_zone)}
   end
 
   defp serialize_argument(arg) when is_map(arg) do
-    # For maps, serialize keys as strings (JSON-compatible)
-    # Check if it's a struct first (structs are maps but have __struct__ key)
     case Map.get(arg, :__struct__) do
       nil ->
-        # Regular map, serialize recursively
         serialized =
           Enum.into(arg, %{}, fn
             {k, v} when is_atom(k) -> {to_string(k), serialize_argument(v)}
             {k, v} -> {k, serialize_argument(v)}
           end)
 
-        # Add _aj_ruby2_keywords marker for ActiveJob keyword arguments
-        # This tells Rails to treat the hash as keyword arguments when deserializing
-        # Extract all string keys that were originally atoms (keyword arguments)
         keyword_keys =
           arg
           |> Map.keys()
@@ -273,7 +260,6 @@ defmodule GoodJob.Protocol.Serialization do
         end
 
       _struct ->
-        # It's a struct but not one we handle above, convert to string
         inspect(arg)
     end
   end
@@ -283,8 +269,6 @@ defmodule GoodJob.Protocol.Serialization do
   end
 
   defp serialize_argument(arg) do
-    # For other types (tuples, etc.), convert to string representation
-    # In production, you might want to use GlobalID or similar
     inspect(arg)
   end
 
@@ -295,7 +279,6 @@ defmodule GoodJob.Protocol.Serialization do
   defp deserialize_arguments(arguments), do: arguments
 
   defp deserialize_argument(arg) when is_binary(arg) do
-    # Try to detect if it's a serialized atom
     case String.starts_with?(arg, ":") do
       true -> String.slice(arg, 1..-1//1) |> String.to_atom()
       false -> arg
@@ -307,26 +290,25 @@ defmodule GoodJob.Protocol.Serialization do
   defp deserialize_argument(arg) when is_nil(arg), do: nil
 
   defp deserialize_argument(arg) when is_map(arg) do
-    # Check if this is an ActiveJob serialized object (e.g., Date, DateTime, etc.)
-    case Map.get(arg, "_aj_serialized") do
-      nil ->
-        # Regular map, convert string keys to atoms where appropriate
-        # Strip out _aj_ruby2_keywords marker (Rails-specific, not needed in Elixir)
-        arg
-        |> Enum.reject(fn {k, _v} -> k == "_aj_ruby2_keywords" end)
-        |> Enum.into(%{}, fn
-          {k, v} when is_binary(k) ->
-            # Try to convert to atom if it looks like one
-            atom_key = try_convert_to_atom(k)
-            {atom_key, deserialize_argument(v)}
+    if serialized_global_id?(arg) do
+      deserialize_global_id(arg)
+    else
+      case Map.get(arg, "_aj_serialized") do
+        nil ->
+          arg
+          |> Enum.reject(fn {k, _v} -> k == "_aj_ruby2_keywords" end)
+          |> Enum.into(%{}, fn
+            {k, v} when is_binary(k) ->
+              atom_key = try_convert_to_atom(k)
+              {atom_key, deserialize_argument(v)}
 
-          {k, v} ->
-            {k, deserialize_argument(v)}
-        end)
+            {k, v} ->
+              {k, deserialize_argument(v)}
+          end)
 
-      serializer_name ->
-        # This is an ActiveJob serialized object, deserialize it
-        deserialize_aj_object(arg, serializer_name)
+        serializer_name ->
+          deserialize_aj_object(arg, serializer_name)
+      end
     end
   end
 
@@ -336,8 +318,41 @@ defmodule GoodJob.Protocol.Serialization do
 
   defp deserialize_argument(arg), do: arg
 
+  defp serialized_global_id?(hash) when is_map(hash) do
+    map_size(hash) == 1 && Map.has_key?(hash, "_aj_globalid")
+  end
+
+  defp deserialize_global_id(%{"_aj_globalid" => gid_string}) when is_binary(gid_string) do
+    case parse_global_id(gid_string) do
+      {:ok, %{app: app, model: model, id: id}} ->
+        %{
+          __struct__: :global_id,
+          app: app,
+          model: model,
+          id: id,
+          gid: gid_string
+        }
+
+      {:error, _} ->
+        gid_string
+    end
+  end
+
+  defp deserialize_global_id(arg), do: arg
+
+  defp parse_global_id("gid://" <> rest) do
+    case String.split(rest, "/") do
+      [app, model, id] ->
+        {:ok, %{app: app, model: model, id: id}}
+
+      _ ->
+        {:error, :invalid_format}
+    end
+  end
+
+  defp parse_global_id(_), do: {:error, :invalid_format}
+
   defp try_convert_to_atom(string) do
-    # Only convert if it looks like a valid atom (alphanumeric + underscore)
     if String.match?(string, ~r/^[a-z_][a-z0-9_]*$/i) do
       try do
         String.to_existing_atom(string)
@@ -349,13 +364,11 @@ defmodule GoodJob.Protocol.Serialization do
     end
   end
 
-  # Deserializes ActiveJob serialized objects (Date, DateTime, Time, Symbol, etc.)
   defp deserialize_aj_object(arg, serializer_name) do
     value = Map.get(arg, "value")
 
     case serializer_name do
       "ActiveJob::Serializers::DateSerializer" ->
-        # Date is serialized as ISO8601 string: "2026-01-05"
         if is_binary(value) do
           case Date.from_iso8601(value) do
             {:ok, date} -> date
@@ -366,7 +379,6 @@ defmodule GoodJob.Protocol.Serialization do
         end
 
       "ActiveJob::Serializers::DateTimeSerializer" ->
-        # DateTime is serialized as ISO8601 string
         if is_binary(value) do
           case DateTime.from_iso8601(value) do
             {:ok, dt, _} -> dt
@@ -377,7 +389,6 @@ defmodule GoodJob.Protocol.Serialization do
         end
 
       "ActiveJob::Serializers::TimeSerializer" ->
-        # Time is serialized as ISO8601 string
         if is_binary(value) do
           case DateTime.from_iso8601(value) do
             {:ok, dt, _} -> dt
@@ -388,21 +399,10 @@ defmodule GoodJob.Protocol.Serialization do
         end
 
       "ActiveJob::Serializers::TimeWithZoneSerializer" ->
-        # TimeWithZone is serialized as ISO8601 string with time_zone
         if is_binary(value) do
           case DateTime.from_iso8601(value) do
             {:ok, dt, _} ->
-              # Elixir DateTime doesn't have time zones like Rails TimeWithZone
-              # We return DateTime with the timezone info if available
-              time_zone = Map.get(arg, "time_zone")
-
-              if time_zone do
-                # Try to set timezone (though Elixir DateTime doesn't support this natively)
-                # For now, just return the DateTime
-                dt
-              else
-                dt
-              end
+              dt
 
             {:error, _} ->
               value
@@ -412,13 +412,11 @@ defmodule GoodJob.Protocol.Serialization do
         end
 
       "ActiveJob::Serializers::SymbolSerializer" ->
-        # Symbol is serialized as string, convert back to atom
         if is_binary(value) do
           try do
             String.to_existing_atom(value)
           rescue
             ArgumentError ->
-              # Atom doesn't exist, create it (safe for job arguments)
               String.to_atom(value)
           end
         else
@@ -426,8 +424,6 @@ defmodule GoodJob.Protocol.Serialization do
         end
 
       "ActiveJob::Serializers::BigDecimalSerializer" ->
-        # BigDecimal is serialized as string
-        # Try to use Decimal if available, otherwise return as string or float
         if is_binary(value) do
           case Code.ensure_loaded(Decimal) do
             {:module, Decimal} ->
@@ -437,7 +433,6 @@ defmodule GoodJob.Protocol.Serialization do
               end
 
             {:error, _} ->
-              # Decimal not available, try to convert to float
               case Float.parse(value) do
                 {float, _} -> float
                 :error -> value
@@ -448,24 +443,17 @@ defmodule GoodJob.Protocol.Serialization do
         end
 
       "ActiveJob::Serializers::DurationSerializer" ->
-        # Duration is serialized as value and parts
-        # Elixir doesn't have ActiveSupport::Duration, so we return a map representation
         parts = Map.get(arg, "parts", [])
         %{value: value, parts: deserialize_arguments(parts)}
 
       "ActiveJob::Serializers::RangeSerializer" ->
-        # Range is serialized as begin, end, exclude_end
         begin_val = deserialize_argument(Map.get(arg, "begin"))
         end_val = deserialize_argument(Map.get(arg, "end"))
         exclude_end = Map.get(arg, "exclude_end", false)
-
-        # Elixir doesn't have Range like Ruby, so we return a map representation
         %{begin: begin_val, end: end_val, exclude_end: exclude_end}
 
       "ActiveJob::Serializers::ModuleSerializer" ->
-        # Module is serialized as string name
         if is_binary(value) do
-          # Try to resolve the module
           module_string = "Elixir.#{value}"
 
           try do
@@ -483,7 +471,6 @@ defmodule GoodJob.Protocol.Serialization do
         end
 
       _ ->
-        # Unknown serializer, return the value as-is
         value
     end
   end

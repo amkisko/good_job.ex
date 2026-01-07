@@ -89,7 +89,7 @@ defmodule GoodJob.Protocol.Deserializer do
       |> Map.delete("_aj_symbol_keys")
       |> Map.delete("_aj_ruby2_keywords")
       |> Map.delete("_aj_hash_with_indifferent_access")
-      |> Map.delete("_aj_globalid")
+      # Note: _aj_globalid is handled in Serialization.deserialize_argument, not deleted here
       |> Map.delete("_aj_serialized")
 
     Enum.into(cleaned, %{}, fn
@@ -128,13 +128,45 @@ defmodule GoodJob.Protocol.Deserializer do
         end)
 
       _struct ->
-        # It's a struct (like Date, DateTime, etc.), return as-is
         map
     end
   end
 
-  defp normalize_value(v) when is_map(v), do: normalize_map_keys(v)
+  defp normalize_value(v) when is_map(v) do
+    if map_size(v) == 1 && Map.has_key?(v, "_aj_globalid") do
+      gid_string = Map.get(v, "_aj_globalid")
+
+      case parse_global_id_string(gid_string) do
+        {:ok, %{app: app, model: model, id: id}} ->
+          %{
+            __struct__: :global_id,
+            app: app,
+            model: model,
+            id: id,
+            gid: gid_string
+          }
+
+        {:error, _} ->
+          normalize_map_keys(v)
+      end
+    else
+      normalize_map_keys(v)
+    end
+  end
+
   defp normalize_value(v), do: v
+
+  defp parse_global_id_string("gid://" <> rest) do
+    case String.split(rest, "/") do
+      [app, model, id] ->
+        {:ok, %{app: app, model: model, id: id}}
+
+      _ ->
+        {:error, :invalid_format}
+    end
+  end
+
+  defp parse_global_id_string(_), do: {:error, :invalid_format}
 
   defp try_convert_key_to_atom(string) when is_binary(string) do
     cond do
