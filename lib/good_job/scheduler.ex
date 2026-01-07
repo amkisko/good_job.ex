@@ -257,7 +257,7 @@ defmodule GoodJob.Scheduler do
           t when t > 0 -> max(0, t - check_interval)
         end
 
-      case GenServer.call(scheduler_pid, :get_running_tasks_count, check_interval) do
+      case safe_get_running_tasks_count(scheduler_pid, check_interval) do
         {:ok, 0} ->
           :ok
 
@@ -280,6 +280,15 @@ defmodule GoodJob.Scheduler do
             wait_for_tasks_loop(running_tasks, remaining_timeout, scheduler_pid)
           end
       end
+    end
+  end
+
+  defp safe_get_running_tasks_count(scheduler_pid, timeout) do
+    try do
+      GenServer.call(scheduler_pid, :get_running_tasks_count, timeout)
+    catch
+      :exit, _ ->
+        :error
     end
   end
 

@@ -323,88 +323,48 @@ defmodule GoodJob.SchedulerTest do
   end
 
   test "shutdown waits for tasks and returns timeout" do
-    Application.put_env(:good_job, :config, %{repo: GoodJob.TestRepo, poll_interval: 2})
-
-    queue_string = "shutdown-timeout-#{System.unique_integer([:positive])}"
-
-    {:ok, scheduler} =
-      Scheduler.start_link(queue_string: queue_string, max_processes: 0)
-
     ref = make_ref()
     task = %Task{ref: ref, pid: self(), owner: self(), mfa: {Kernel, :self, 0}}
     job = %Job{id: "job-id"}
+    from = {self(), make_ref()}
 
-    :sys.replace_state(scheduler, fn state ->
-      %{state | running_tasks: %{ref => {task, job}}}
-    end)
+    state = base_state(%{running_tasks: %{ref => {task, job}}})
 
-    assert :timeout == GenServer.call(scheduler, {:shutdown, 0}, 2000)
+    assert {:noreply, state} = Scheduler.handle_call({:shutdown, 0}, from, state)
+    assert state.shutdown == true
 
-    if Process.alive?(scheduler) do
-      GenServer.stop(scheduler, :normal, 1000)
-    end
+    assert {:noreply, _state} = Scheduler.handle_info({:tasks_timeout, from}, state)
+    assert_receive {_, :timeout}
   end
 
   test "shutdown waits for tasks and returns ok with finite timeout" do
-    Application.put_env(:good_job, :config, %{repo: GoodJob.TestRepo, poll_interval: 2})
-
-    queue_string = "shutdown-finite-#{System.unique_integer([:positive])}"
-
-    {:ok, scheduler} =
-      Scheduler.start_link(queue_string: queue_string, max_processes: 0)
-
     ref = make_ref()
     task = %Task{ref: ref, pid: self(), owner: self(), mfa: {Kernel, :self, 0}}
     job = %Job{id: "job-id"}
+    from = {self(), make_ref()}
 
-    :sys.replace_state(scheduler, fn state ->
-      %{state | running_tasks: %{ref => {task, job}}}
-    end)
+    state = base_state(%{running_tasks: %{ref => {task, job}}})
 
-    spawn(fn ->
-      Process.sleep(100)
+    assert {:noreply, state} = Scheduler.handle_call({:shutdown, 1}, from, state)
+    assert state.shutdown == true
 
-      :sys.replace_state(scheduler, fn state ->
-        %{state | running_tasks: %{}}
-      end)
-    end)
-
-    assert :ok == GenServer.call(scheduler, {:shutdown, 1}, 5000)
-
-    if Process.alive?(scheduler) do
-      GenServer.stop(scheduler, :normal, 1000)
-    end
+    assert {:noreply, _state} = Scheduler.handle_info({:tasks_complete, from}, state)
+    assert_receive {_, :ok}
   end
 
   test "shutdown waits for tasks and returns ok with infinite timeout" do
-    Application.put_env(:good_job, :config, %{repo: GoodJob.TestRepo, poll_interval: 2})
-
-    queue_string = "shutdown-infinity-#{System.unique_integer([:positive])}"
-
-    {:ok, scheduler} =
-      Scheduler.start_link(queue_string: queue_string, max_processes: 0)
-
     ref = make_ref()
     task = %Task{ref: ref, pid: self(), owner: self(), mfa: {Kernel, :self, 0}}
     job = %Job{id: "job-id"}
+    from = {self(), make_ref()}
 
-    :sys.replace_state(scheduler, fn state ->
-      %{state | running_tasks: %{ref => {task, job}}}
-    end)
+    state = base_state(%{running_tasks: %{ref => {task, job}}})
 
-    spawn(fn ->
-      Process.sleep(100)
+    assert {:noreply, state} = Scheduler.handle_call({:shutdown, -1}, from, state)
+    assert state.shutdown == true
 
-      :sys.replace_state(scheduler, fn state ->
-        %{state | running_tasks: %{}}
-      end)
-    end)
-
-    assert :ok == GenServer.call(scheduler, {:shutdown, -1}, 5000)
-
-    if Process.alive?(scheduler) do
-      GenServer.stop(scheduler, :normal, 1000)
-    end
+    assert {:noreply, _state} = Scheduler.handle_info({:tasks_complete, from}, state)
+    assert_receive {_, :ok}
   end
 
   test "shutdown uses configured default timeout" do
