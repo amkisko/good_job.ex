@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## 0.1.1
+
+- Align Elixir execution semantics with Ruby GoodJob protocol handling
+- Improve concurrency limits, throttling, and perform-limit behaviors
+- Expand ActiveJob serialization/deserialization coverage and compatibility
+- Harden job execution result handling and error propagation
+- Improve scheduler and process tracking behavior and test coverage
+- Add telemetry formatter coverage and cleanup/batch handling improvements
+- Update monorepo example with cross-language concurrency and GlobalID jobs
+
 ## 0.1.0
 
 - Initial public release of `good_job.ex`
