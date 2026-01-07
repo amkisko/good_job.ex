@@ -48,6 +48,12 @@ class HomeComponent < ApplicationComponent
         render_enqueue_form("elixir", "Enqueue Elixir Job", "btn-success")
         render_enqueue_form("example", "Enqueue Ruby Job", "btn-primary")
       end
+      h3(class: "mt-4 mb-2", style: "margin-top: 1rem; margin-bottom: 0.5rem; font-size: 1rem; font-weight: 600; color: #667eea;") { "Test Features" }
+      div(class: "enqueue-buttons") do
+        render_enqueue_form("globalid", "Test GlobalID", "btn-info")
+        render_enqueue_form("concurrency", "Test Concurrency", "btn-info")
+        render_enqueue_form("cross_language_concurrency", "Test Cross-Language Concurrency", "btn-info")
+      end
     end
   end
 
@@ -247,6 +253,19 @@ class HomeComponent < ApplicationComponent
       }
       .btn-info {
         background: linear-gradient(135deg, #0dcaf0 0%, #0aa2c0 100%);
+      }
+      .btn-warning {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+      }
+      .btn-gradient-blue {
+        background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+      }
+      h3 {
+        font-size: 1rem;
+        font-weight: 600;
+        color: #667eea;
+        margin-top: 1rem;
+        margin-bottom: 0.5rem;
       }
       .jobs-table-wrapper {
         overflow-x: auto;

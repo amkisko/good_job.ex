@@ -91,6 +91,19 @@ defmodule MonorepoExampleWeb.Components.Jobs do
         |> render_enqueue_form("elixir", csrf_token, "Enqueue Elixir Job", "background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);")
         |> render_enqueue_form("ruby", csrf_token, "Enqueue Ruby Job", "background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);")
       end)
+      |> h3([
+        class: "text-base font-semibold mt-4 mb-2",
+        style: "margin-top: 1rem; margin-bottom: 0.5rem; font-size: 1rem; font-weight: 600; color: #667eea; text-align: center;"
+      ], "Test Features")
+      |> div([
+        class: "flex gap-2 sm:gap-4 flex-wrap justify-center",
+        style: "display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: center;"
+      ], fn state ->
+        state
+        |> render_enqueue_form("globalid", csrf_token, "Test GlobalID", "background: linear-gradient(135deg, #0dcaf0 0%, #0aa2c0 100%);")
+        |> render_enqueue_form("concurrency", csrf_token, "Test Concurrency", "background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);")
+        |> render_enqueue_form("cross_language_concurrency", csrf_token, "Test Cross-Language Concurrency", "background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);")
+      end)
     end)
   end
 

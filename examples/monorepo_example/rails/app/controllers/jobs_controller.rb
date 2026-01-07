@@ -18,6 +18,27 @@ class JobsController < ApplicationController
       job = ZigExampleJob.perform_later(
         message: params[:message] || "Example job for Zig"
       )
+    when "globalid"
+      # Test GlobalID resolution
+      user = User.find(rand(1..100))
+      job = GlobalidTestJob.perform_later(
+        user: user,
+        message: "GlobalID test from Rails UI at #{Time.current}"
+      )
+    when "concurrency"
+      # Test concurrency limits
+      resource_id = params[:resource_id] || rand(1..10).to_s
+      job = ConcurrencyTestJob.perform_later(
+        key: resource_id,
+        message: "Concurrency test from Rails UI at #{Time.current}"
+      )
+    when "cross_language_concurrency"
+      # Test cross-language concurrency
+      resource_id = params[:resource_id] || rand(1..5).to_s
+      job = CrossLanguageConcurrencyJob.perform_later(
+        resource_id: resource_id,
+        action: "process"
+      )
     else
       if request.format.html?
         redirect_to root_path, alert: "Unknown job type: #{job_type}"

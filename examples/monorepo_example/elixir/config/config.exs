@@ -38,7 +38,10 @@ config :good_job,
     external_jobs: %{
       "ElixirProcessedJob" => MonorepoExample.Jobs.ProcessJob,
       "ExampleJob" => MonorepoExample.Jobs.ExampleRubyJob,
-      "ScheduledRubyJob" => MonorepoExample.Jobs.ScheduledRubyJob
+      "ScheduledRubyJob" => MonorepoExample.Jobs.ScheduledRubyJob,
+      "GlobalidTestJob" => MonorepoExample.Jobs.GlobalidTestJob,
+      "ConcurrencyTestJob" => MonorepoExample.Jobs.ConcurrencyTestJob,
+      "CrossLanguageConcurrencyJob" => MonorepoExample.Jobs.CrossLanguageConcurrencyJob
     },
     cron: %{
       # Elixir cron job - runs every 3 minutes
