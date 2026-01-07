@@ -1,8 +1,8 @@
 defmodule GoodJob.RepoPoolTest do
   use ExUnit.Case
 
-  alias GoodJob.RepoPool
   alias GoodJob.Repo
+  alias GoodJob.RepoPool
 
   setup do
     original_config = Application.get_env(:good_job, :config, %{})
@@ -37,12 +37,14 @@ defmodule GoodJob.RepoPoolTest do
     })
 
     repo = Repo.repo()
+
     conn_opts =
       repo.config()
       |> Keyword.take([:hostname, :username, :password, :database, :port, :ssl, :ssl_opts, :socket_dir])
       |> Enum.reject(fn {_, value} -> is_nil(value) end)
 
     {:ok, conn} = Postgrex.start_link(conn_opts)
+
     on_exit(fn ->
       if Process.alive?(conn) do
         GenServer.stop(conn)

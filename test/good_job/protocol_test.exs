@@ -1,9 +1,9 @@
 defmodule GoodJob.ProtocolTest do
   use GoodJob.Testing.JobCase
 
+  alias GoodJob.Job
   alias GoodJob.Protocol
   alias GoodJob.Repo
-  alias GoodJob.Job
 
   defmodule ProtocolJob do
     use GoodJob.Job

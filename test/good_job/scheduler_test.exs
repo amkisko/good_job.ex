@@ -189,7 +189,6 @@ defmodule GoodJob.SchedulerTest do
     if Process.alive?(task_supervisor) do
       Supervisor.stop(task_supervisor, :normal, 1000)
     end
-
   end
 
   test "poll starts task and schedules with full capacity" do

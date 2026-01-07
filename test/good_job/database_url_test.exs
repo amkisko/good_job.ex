@@ -26,9 +26,7 @@ defmodule GoodJob.DatabaseURLTest do
 
   test "parses database url with userinfo, port, and query params" do
     config =
-      DatabaseURL.parse(
-        "postgres://user:pass@localhost:5433/mydb?pool_size=5&ssl=true&timeout=3000"
-      )
+      DatabaseURL.parse("postgres://user:pass@localhost:5433/mydb?pool_size=5&ssl=true&timeout=3000")
 
     assert config[:username] == "user"
     assert config[:password] == "pass"

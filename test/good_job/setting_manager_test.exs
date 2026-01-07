@@ -1,9 +1,9 @@
 defmodule GoodJob.SettingManagerTest do
   use GoodJob.Testing.JobCase
 
+  alias GoodJob.Repo
   alias GoodJob.SettingManager
   alias GoodJob.SettingSchema
-  alias GoodJob.Repo
 
   setup do
     repo = Repo.repo()
@@ -45,9 +45,7 @@ defmodule GoodJob.SettingManagerTest do
 
   test "cron_key_enabled? respects default false" do
     repo = Repo.repo()
-    repo.insert!(
-      SettingSchema.changeset(%SettingSchema{}, %{key: "cron_keys_enabled", value: %{keys: ["cron-2"]}})
-    )
+    repo.insert!(SettingSchema.changeset(%SettingSchema{}, %{key: "cron_keys_enabled", value: %{keys: ["cron-2"]}}))
 
     assert SettingManager.cron_key_enabled?("cron-2", false) == true
     assert SettingManager.cron_key_enabled?("cron-3", false) == false
@@ -55,6 +53,7 @@ defmodule GoodJob.SettingManagerTest do
 
   test "unpause_by_key deletes setting" do
     repo = Repo.repo()
+
     setting =
       %SettingSchema{}
       |> SettingSchema.changeset(%{key: "pause:queue:default", value: %{paused: true}})

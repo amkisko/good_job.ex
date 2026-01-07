@@ -1,9 +1,9 @@
 defmodule GoodJob.ProcessTrackerTest do
   use GoodJob.Testing.JobCase
 
+  alias GoodJob.Process, as: ProcessSchema
   alias GoodJob.ProcessTracker
   alias GoodJob.Repo
-  alias GoodJob.Process, as: ProcessSchema
 
   setup do
     repo = Repo.repo()

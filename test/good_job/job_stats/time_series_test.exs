@@ -1,8 +1,8 @@
 defmodule GoodJob.JobStats.TimeSeriesTest do
   use GoodJob.Testing.JobCase
 
-  alias GoodJob.JobStats.TimeSeries
   alias GoodJob.{Job, Repo}
+  alias GoodJob.JobStats.TimeSeries
 
   setup do
     repo = Repo.repo()

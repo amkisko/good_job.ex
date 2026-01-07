@@ -1,8 +1,8 @@
 defmodule GoodJob.JobExecutor.ResultHandlerTest do
   use GoodJob.Testing.JobCase
 
-  alias GoodJob.JobExecutor.ResultHandler
   alias GoodJob.{Job, Repo}
+  alias GoodJob.JobExecutor.ResultHandler
 
   defmodule RetryJob do
     use GoodJob.Job, max_attempts: 2

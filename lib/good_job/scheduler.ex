@@ -284,12 +284,10 @@ defmodule GoodJob.Scheduler do
   end
 
   defp safe_get_running_tasks_count(scheduler_pid, timeout) do
-    try do
-      GenServer.call(scheduler_pid, :get_running_tasks_count, timeout)
-    catch
-      :exit, _ ->
-        :error
-    end
+    GenServer.call(scheduler_pid, :get_running_tasks_count, timeout)
+  catch
+    :exit, _ ->
+      :error
   end
 
   defp schedule_poll(delay \\ 0) do

@@ -22,6 +22,7 @@ defmodule GoodJob.Notifier.BasicTest do
 
   test "add_recipient and remove_recipient update state in disabled mode" do
     Application.put_env(:good_job, :config, %{repo: GoodJob.TestRepo, enable_listen_notify: false})
+
     pid =
       case Process.whereis(Notifier) do
         nil -> start_supervised!(Notifier)
