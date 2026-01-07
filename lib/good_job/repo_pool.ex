@@ -113,11 +113,11 @@ defmodule GoodJob.RepoPool do
     lock_timeout = GoodJob.Config.database_lock_timeout()
 
     if statement_timeout do
-      Postgrex.query!(conn, "SET statement_timeout = $1", [statement_timeout])
+      Postgrex.query!(conn, "SET statement_timeout = #{statement_timeout}", [])
     end
 
     if lock_timeout do
-      Postgrex.query!(conn, "SET lock_timeout = $1", [lock_timeout])
+      Postgrex.query!(conn, "SET lock_timeout = #{lock_timeout}", [])
     end
 
     :ok

@@ -85,6 +85,9 @@ defmodule GoodJob.Job do
   def order_by_created_asc(query \\ __MODULE__), do: Query.order_by_created_asc(query)
   def order_by_scheduled_asc(query \\ __MODULE__), do: Query.order_by_scheduled_asc(query)
   def order_by_finished_desc(query \\ __MODULE__), do: Query.order_by_finished_desc(query)
+  def advisory_locked(query \\ __MODULE__), do: Query.advisory_locked(query)
+  def advisory_unlocked(query \\ __MODULE__), do: Query.advisory_unlocked(query)
+  def joins_advisory_locks(query \\ __MODULE__), do: Query.joins_advisory_locks(query)
 
   # Delegate state calculation to Job.State
   defdelegate calculate_state(job), to: State, as: :calculate
@@ -242,7 +245,29 @@ defmodule GoodJob.Job do
         ]
 
         opts = Keyword.merge(default_opts, opts)
+
+        # Generate concurrency_key from module-level function if not provided in opts
+        opts =
+          if Keyword.has_key?(opts, :concurrency_key) do
+            opts
+          else
+            concurrency_key = generate_concurrency_key(args, opts)
+            Keyword.put(opts, :concurrency_key, concurrency_key)
+          end
+
         GoodJob.enqueue(__MODULE__, args, opts)
+      end
+
+      defp generate_concurrency_key(args, _opts) do
+        if function_exported?(__MODULE__, :good_job_concurrency_key, 1) do
+          case apply(__MODULE__, :good_job_concurrency_key, [args]) do
+            nil -> nil
+            key when is_binary(key) -> key
+            key -> to_string(key)
+          end
+        else
+          nil
+        end
       end
 
       def perform_now(args \\ %{}) do

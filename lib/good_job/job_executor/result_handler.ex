@@ -8,6 +8,182 @@ defmodule GoodJob.JobExecutor.ResultHandler do
   alias Ecto.Multi
   alias GoodJob.{Execution, Job, Repo, Utils}
 
+  defmodule ExecutionContext do
+    @moduledoc false
+    defstruct [
+      :job,
+      :execution,
+      :value,
+      :handled_error,
+      :unhandled_error,
+      :error_event,
+      :start_time,
+      :process_id,
+      :stacktrace
+    ]
+  end
+
+  @doc """
+  Finishes execution by updating execution and job records.
+  """
+  @spec finish_execution(Job.t(), Execution.t(), term(), term(), term(), atom(), integer(), String.t() | nil, list()) ::
+          :ok | {:error, Ecto.Changeset.t()}
+  # credo:disable-for-next-line
+  def finish_execution(
+        job,
+        execution,
+        value,
+        handled_error,
+        unhandled_error,
+        error_event,
+        start_time,
+        process_id,
+        stacktrace \\ []
+      ) do
+    context = %ExecutionContext{
+      job: job,
+      execution: execution,
+      value: value,
+      handled_error: handled_error,
+      unhandled_error: unhandled_error,
+      error_event: error_event,
+      start_time: start_time,
+      process_id: process_id,
+      stacktrace: stacktrace
+    }
+
+    finish_execution(context)
+  end
+
+  defp finish_execution(%ExecutionContext{} = context) do
+    job = context.job
+    execution = context.execution
+
+    repo = Repo.repo()
+    job_finished_at = DateTime.utc_now()
+    monotonic_duration = System.monotonic_time() - context.start_time
+
+    executions_count = job.executions_count || 0
+
+    updated_serialized_params =
+      if is_map(job.serialized_params) do
+        GoodJob.Protocol.Serialization.update_executions(job.serialized_params, executions_count)
+      else
+        job.serialized_params
+      end
+
+    base_job_attributes = %{
+      locked_by_id: nil,
+      locked_at: nil,
+      executions_count: executions_count,
+      serialized_params: updated_serialized_params
+    }
+
+    job_error = context.handled_error || context.unhandled_error
+    error_string = if job_error, do: Utils.format_error(job_error), else: nil
+
+    retry_decision = fn ->
+      max_attempts = get_max_attempts(job)
+      backoff_seconds = calculate_backoff(job, executions_count)
+
+      if executions_count >= max_attempts do
+        {false, nil, job_finished_at, :retry_stopped}
+      else
+        {true, DateTime.add(job_finished_at, backoff_seconds, :second), nil, :retried}
+      end
+    end
+
+    {retrying, scheduled_at, finished_at, error_event_for_job} =
+      case context.error_event do
+        :handled ->
+          retry_decision.()
+
+        :unhandled ->
+          if GoodJob.Config.retry_on_unhandled_error?() do
+            retry_decision.()
+          else
+            {false, nil, job_finished_at, :unhandled}
+          end
+
+        :snoozed ->
+          snoozed_at =
+            case context.value do
+              {:snooze, seconds} when is_integer(seconds) ->
+                DateTime.add(job_finished_at, seconds, :second)
+
+              _ ->
+                nil
+            end
+
+          {true, snoozed_at, nil, nil}
+
+        :discarded ->
+          {false, nil, job_finished_at, :discarded}
+
+        :cancelled ->
+          {false, nil, job_finished_at, :cancelled}
+
+        _ ->
+          {false, nil, job_finished_at, nil}
+      end
+
+    job_attributes =
+      base_job_attributes
+      |> Map.merge(%{
+        error: error_string,
+        error_event: error_event_to_int(error_event_for_job),
+        finished_at: finished_at,
+        scheduled_at: scheduled_at
+      })
+      |> maybe_clear_performed_at(context.error_event, retrying)
+
+    execution_attributes = %{
+      error: error_string,
+      error_event: error_event_to_int(error_event_for_job),
+      error_backtrace:
+        if(context.unhandled_error,
+          do: format_backtrace(context.unhandled_error, context.stacktrace),
+          else: nil
+        ),
+      finished_at: if(retrying, do: nil, else: job_finished_at),
+      duration: format_duration(monotonic_duration)
+    }
+
+    reenqueued = is_nil(job_attributes[:finished_at])
+
+    preserve_unhandled =
+      context.unhandled_error &&
+        (GoodJob.Config.retry_on_unhandled_error?() ||
+           GoodJob.Config.preserve_job_records?() == :on_unhandled_error)
+
+    # Ensure job is a struct before accessing fields
+    job_cron_key = job.cron_key
+
+    should_preserve =
+      is_nil(job_attributes[:finished_at]) ||
+        GoodJob.Config.preserve_job_records?() == true ||
+        reenqueued ||
+        preserve_unhandled ||
+        not is_nil(job_cron_key)
+
+    if should_preserve do
+      repo.transaction(fn ->
+        execution
+        |> Execution.changeset(execution_attributes)
+        |> repo.update!()
+
+        job
+        |> Job.changeset(job_attributes)
+        |> repo.update!()
+      end)
+
+      :ok
+    else
+      repo.delete(job)
+      :ok
+    end
+  end
+
   @doc """
   Normalizes job result for consistent handling.
   """
@@ -325,6 +501,14 @@ defmodule GoodJob.JobExecutor.ResultHandler do
 
   defp maybe_put_performed_at(attrs, _job, _finished_at), do: attrs
 
+  defp maybe_clear_performed_at(attrs, error_event, retrying) do
+    if retrying and error_event in [:handled, :unhandled] do
+      Map.put(attrs, :performed_at, nil)
+    else
+      attrs
+    end
+  end
+
   defp update_job_error(job, error, finished_at, executions_count, scheduled_at) do
     updated_serialized_params =
       if is_map(job.serialized_params) do
@@ -437,7 +621,11 @@ defmodule GoodJob.JobExecutor.ResultHandler do
 
   defp format_error(error), do: Utils.format_error(error)
 
-  defp format_backtrace(_error, stacktrace), do: Utils.format_backtrace(stacktrace)
+  defp format_backtrace(_error, stacktrace) when is_list(stacktrace) do
+    Utils.format_backtrace(stacktrace)
+  end
+
+  defp format_backtrace(_error, _), do: []
 
   defp format_duration(duration_nanoseconds) do
     total_microseconds = div(duration_nanoseconds, 1_000)
@@ -445,4 +633,11 @@ defmodule GoodJob.JobExecutor.ResultHandler do
     microsecs = rem(total_microseconds, 1_000_000)
     %Postgrex.Interval{months: 0, days: 0, secs: secs, microsecs: microsecs}
   end
+
+  defp error_event_to_int(:unhandled), do: 1
+  defp error_event_to_int(:retried), do: 3
+  defp error_event_to_int(:retry_stopped), do: 4
+  defp error_event_to_int(:discarded), do: 5
+  defp error_event_to_int(nil), do: nil
+  defp error_event_to_int(_), do: nil
 end

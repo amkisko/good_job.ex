@@ -105,25 +105,25 @@ defmodule GoodJob.SettingManager do
   def enable_cron(cron_key) do
     repo = Repo.repo()
     key = "cron_keys_enabled"
-    setting = repo.get_by(SettingSchema, key: key) || %SettingSchema{key: key, value: []}
+    setting = repo.get_by(SettingSchema, key: key) || %SettingSchema{key: key, value: %{}}
 
-    enabled_list = setting.value || []
+    enabled_list = cron_keys_from_value(setting.value)
     cron_key_str = to_string(cron_key)
 
     if cron_key_str not in enabled_list do
       updated_value = [cron_key_str | enabled_list] |> Enum.uniq()
-      setting |> SettingSchema.changeset(%{value: updated_value}) |> repo.update!()
+      persist_setting(repo, setting, %{keys: updated_value})
     end
 
     # Remove from disabled list if present
     disabled_setting = repo.get_by(SettingSchema, key: "cron_keys_disabled")
 
     if disabled_setting do
-      disabled_list = disabled_setting.value || []
+      disabled_list = cron_keys_from_value(disabled_setting.value)
 
       if cron_key_str in disabled_list do
         updated_disabled = List.delete(disabled_list, cron_key_str)
-        disabled_setting |> SettingSchema.changeset(%{value: updated_disabled}) |> repo.update!()
+        persist_setting(repo, disabled_setting, %{keys: updated_disabled})
       end
     end
 
@@ -136,25 +136,25 @@ defmodule GoodJob.SettingManager do
   def disable_cron(cron_key) do
     repo = Repo.repo()
     key = "cron_keys_disabled"
-    setting = repo.get_by(SettingSchema, key: key) || %SettingSchema{key: key, value: []}
+    setting = repo.get_by(SettingSchema, key: key) || %SettingSchema{key: key, value: %{}}
 
-    disabled_list = setting.value || []
+    disabled_list = cron_keys_from_value(setting.value)
     cron_key_str = to_string(cron_key)
 
     if cron_key_str not in disabled_list do
       updated_value = [cron_key_str | disabled_list] |> Enum.uniq()
-      setting |> SettingSchema.changeset(%{value: updated_value}) |> repo.update!()
+      persist_setting(repo, setting, %{keys: updated_value})
     end
 
     # Remove from enabled list if present
     enabled_setting = repo.get_by(SettingSchema, key: "cron_keys_enabled")
 
     if enabled_setting do
-      enabled_list = enabled_setting.value || []
+      enabled_list = cron_keys_from_value(enabled_setting.value)
 
       if cron_key_str in enabled_list do
         updated_enabled = List.delete(enabled_list, cron_key_str)
-        enabled_setting |> SettingSchema.changeset(%{value: updated_enabled}) |> repo.update!()
+        persist_setting(repo, enabled_setting, %{keys: updated_enabled})
       end
     end
 
@@ -169,13 +169,13 @@ defmodule GoodJob.SettingManager do
     cron_key_str = to_string(cron_key)
 
     disabled_setting = repo.get_by(SettingSchema, key: "cron_keys_disabled")
-    disabled_list = if disabled_setting, do: disabled_setting.value || [], else: []
+    disabled_list = if disabled_setting, do: cron_keys_from_value(disabled_setting.value), else: []
 
     if default do
       cron_key_str not in disabled_list
     else
       enabled_setting = repo.get_by(SettingSchema, key: "cron_keys_enabled")
-      enabled_list = if enabled_setting, do: enabled_setting.value || [], else: []
+      enabled_list = if enabled_setting, do: cron_keys_from_value(enabled_setting.value), else: []
       cron_key_str in enabled_list
     end
   end
@@ -186,5 +186,24 @@ defmodule GoodJob.SettingManager do
   def unpause_by_key(pause_key) do
     repo = Repo.repo()
     delete_setting(repo, pause_key)
+  end
+
+  defp cron_keys_from_value(value) do
+    cond do
+      is_map(value) and Map.has_key?(value, :keys) -> Map.get(value, :keys) || []
+      is_map(value) and Map.has_key?(value, "keys") -> Map.get(value, "keys") || []
+      is_list(value) -> value
+      true -> []
+    end
+  end
+
+  defp persist_setting(repo, setting, value) do
+    changeset = SettingSchema.changeset(setting, %{value: value})
+
+    if setting.id do
+      repo.update!(changeset)
+    else
+      repo.insert!(changeset)
+    end
   end
 end

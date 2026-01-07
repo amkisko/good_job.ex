@@ -21,6 +21,14 @@ defmodule GoodJob.Errors do
     defexception [:message, :job_id, :timeout_ms]
   end
 
+  defmodule PreviouslyPerformedError do
+    defexception [:message]
+  end
+
+  defmodule InterruptError do
+    defexception [:message]
+  end
+
   @doc """
   Classifies an error to determine if it should be retried.
 

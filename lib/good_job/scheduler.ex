@@ -53,7 +53,11 @@ defmodule GoodJob.Scheduler do
   @impl true
   def init({queue_string, max_processes, cleanup_interval_seconds, cleanup_interval_jobs}) do
     # Start task supervisor for job execution
-    {:ok, task_supervisor} = Task.Supervisor.start_link(name: task_supervisor_name(queue_string))
+    task_supervisor =
+      case Task.Supervisor.start_link(name: task_supervisor_name(queue_string)) do
+        {:ok, pid} -> pid
+        {:error, {:already_started, pid}} -> pid
+      end
 
     # Initialize cleanup tracker
     cleanup_tracker =

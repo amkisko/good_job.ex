@@ -56,13 +56,15 @@ defmodule GoodJob do
   def enqueue(job_module, args, opts \\ []) do
     execution_mode = Keyword.get(opts, :execution_mode, :async)
 
-    queue_name = Keyword.get(opts, :queue) || get_default_queue(job_module)
+    {callback_module, job_class_string, external_job_class} = normalize_job_identifier(job_module)
 
-    priority = Keyword.get(opts, :priority) || get_default_priority(job_module)
+    queue_name = Keyword.get(opts, :queue) || get_default_queue(callback_module)
+
+    priority = Keyword.get(opts, :priority) || get_default_priority(callback_module)
     scheduled_at = Keyword.get(opts, :scheduled_at)
     batch_id = Keyword.get(opts, :batch_id)
     concurrency_key = Keyword.get(opts, :concurrency_key)
-    tags = Keyword.get(opts, :tags, get_default_tags(job_module))
+    tags = Keyword.get(opts, :tags, get_default_tags(callback_module))
 
     # Check concurrency limits if configured
     concurrency_result =
@@ -86,19 +88,9 @@ defmodule GoodJob do
     case concurrency_result do
       :ok ->
         # Execute before_enqueue callback
-        case GoodJob.JobCallbacks.before_enqueue(job_module, args, opts) do
+        case before_enqueue(callback_module, args, opts) do
           {:ok, final_args} ->
             active_job_id = Ecto.UUID.generate()
-
-            # job_class stored in the database uses the full Elixir module
-            # name (including the \"Elixir.\" prefix) so that helpers which
-            # compare against to_string/1 (like GoodJob.Testing) can match
-            # reliably.
-            job_class_string = Atom.to_string(job_module)
-
-            # For the serialized ActiveJob payload, use external-style class
-            # naming with \"::\" separators for cross-language compatibility.
-            external_job_class = GoodJob.Protocol.Serialization.module_to_external_class(job_module)
 
             # Serialize in ActiveJob format for cross-language compatibility
             serialized_params =
@@ -130,7 +122,7 @@ defmodule GoodJob do
               {:ok, job} ->
                 # Telemetry.enqueue is now emitted by Job.enqueue/1
                 # Execute after_enqueue callback
-                GoodJob.JobCallbacks.after_enqueue(job_module, job, opts)
+                after_enqueue(callback_module, job, opts)
 
                 # Execute based on mode
                 case execution_mode do
@@ -161,7 +153,7 @@ defmodule GoodJob do
   end
 
   defp get_default_queue(job_module) do
-    if function_exported?(job_module, :__good_job_queue__, 0) do
+    if is_atom(job_module) and function_exported?(job_module, :__good_job_queue__, 0) do
       job_module.__good_job_queue__()
     else
       "default"
@@ -169,7 +161,7 @@ defmodule GoodJob do
   end
 
   defp get_default_priority(job_module) do
-    if function_exported?(job_module, :__good_job_priority__, 0) do
+    if is_atom(job_module) and function_exported?(job_module, :__good_job_priority__, 0) do
       job_module.__good_job_priority__()
     else
       0
@@ -177,7 +169,7 @@ defmodule GoodJob do
   end
 
   defp get_default_tags(job_module) do
-    if function_exported?(job_module, :__good_job_tags__, 0) do
+    if is_atom(job_module) and function_exported?(job_module, :__good_job_tags__, 0) do
       job_module.__good_job_tags__()
     else
       []
@@ -188,13 +180,30 @@ defmodule GoodJob do
     # Get concurrency config from job module or opts
     config = Keyword.get(opts, :concurrency_config, [])
 
-    if function_exported?(job_module, :good_job_concurrency_config, 0) do
+    if is_atom(job_module) and function_exported?(job_module, :good_job_concurrency_config, 0) do
       job_module.good_job_concurrency_config()
       |> Keyword.merge(config)
     else
       config
     end
   end
+
+  defp normalize_job_identifier(job_module) when is_atom(job_module) do
+    job_class_string = Atom.to_string(job_module)
+    external_job_class = GoodJob.Protocol.Serialization.module_to_external_class(job_module)
+    {job_module, job_class_string, external_job_class}
+  end
+
+  defp normalize_job_identifier(job_class_string) when is_binary(job_class_string) do
+    callback_module = Map.get(GoodJob.Config.external_jobs(), job_class_string)
+    {callback_module, job_class_string, job_class_string}
+  end
+
+  defp before_enqueue(nil, args, _opts), do: {:ok, args}
+  defp before_enqueue(job_module, args, opts), do: GoodJob.JobCallbacks.before_enqueue(job_module, args, opts)
+
+  defp after_enqueue(nil, _job, _opts), do: :ok
+  defp after_enqueue(job_module, job, opts), do: GoodJob.JobCallbacks.after_enqueue(job_module, job, opts)
 
   @doc """
   Shuts down all GoodJob processes gracefully.

@@ -9,7 +9,12 @@ defmodule GoodJob.Utils do
   Handles strings, exceptions, and other types.
   """
   def format_error(error) when is_binary(error), do: error
-  def format_error(error) when is_exception(error), do: Exception.message(error)
+
+  def format_error(error) when is_exception(error) do
+    class_name = error.__struct__ |> Module.split() |> List.last()
+    "#{class_name}: #{Exception.message(error)}"
+  end
+
   def format_error(error), do: inspect(error)
 
   @doc """

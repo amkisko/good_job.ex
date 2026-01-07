@@ -102,78 +102,113 @@ defmodule GoodJob.Batch do
   @doc """
   Checks if a batch is complete and executes callbacks if needed.
   """
-  def check_completion(batch_id) when is_binary(batch_id) do
+  def check_completion(batch_id, job \\ nil) when is_binary(batch_id) do
     repo = Repo.repo()
 
     repo.transaction(fn ->
-      # Use get/2 instead of get!/2 so that jobs with a batch_id but without a
-      # corresponding BatchRecord (e.g. Elixir-only jobs created in tests) do
-      # not raise. This matches the behaviour expected by the tests, which
-      # enqueue jobs with a batch_id but no BatchRecord and still expect the
-      # executor to succeed.
       case repo.get(BatchRecord, batch_id) do
         nil ->
           :ok
 
-        batch ->
-          # Check if all jobs in the batch are finished
-          unfinished_count =
-            Job
-            |> Job.with_batch_id(batch_id)
-            |> Job.unfinished()
-            |> repo.aggregate(:count, :id)
+        fresh_batch ->
+          job_discarded = job && not is_nil(job.finished_at) && not is_nil(job.error)
 
-          if unfinished_count == 0 && is_nil(batch.finished_at) do
-            # All jobs are finished, mark batch as finished
-            now = DateTime.utc_now()
+          fresh_batch =
+            if job_discarded && is_nil(fresh_batch.discarded_at) do
+              updated_batch =
+                fresh_batch
+                |> BatchRecord.changeset(%{discarded_at: DateTime.utc_now()})
+                |> repo.update!()
 
-            batch
-            |> BatchRecord.changeset(%{finished_at: now, jobs_finished_at: now})
+              if updated_batch.on_discard do
+                execute_callback(
+                  updated_batch.on_discard,
+                  updated_batch,
+                  :discard,
+                  updated_batch.callback_queue_name,
+                  updated_batch.callback_priority
+                )
+              end
+
+              updated_batch
+            else
+              fresh_batch
+            end
+
+          fresh_batch =
+            if not is_nil(fresh_batch.enqueued_at) &&
+                 is_nil(fresh_batch.jobs_finished_at) &&
+                 unfinished_jobs_count(repo, batch_id) == 0 do
+              now = DateTime.utc_now()
+
+              updated_batch =
+                fresh_batch
+                |> BatchRecord.changeset(%{jobs_finished_at: now})
+                |> repo.update!()
+
+              discarded_count = discarded_jobs_count(repo, batch_id)
+
+              GoodJob.Telemetry.batch_complete(updated_batch, discarded_count)
+
+              if discarded_count == 0 && updated_batch.on_success do
+                execute_callback(
+                  updated_batch.on_success,
+                  updated_batch,
+                  :success,
+                  updated_batch.callback_queue_name,
+                  updated_batch.callback_priority
+                )
+              end
+
+              if updated_batch.on_finish do
+                execute_callback(
+                  updated_batch.on_finish,
+                  updated_batch,
+                  :finish,
+                  updated_batch.callback_queue_name,
+                  updated_batch.callback_priority
+                )
+              end
+
+              updated_batch
+            else
+              fresh_batch
+            end
+
+          if is_nil(fresh_batch.finished_at) &&
+               jobs_finished?(fresh_batch) &&
+               unfinished_callback_jobs_count(repo, batch_id) == 0 do
+            fresh_batch
+            |> BatchRecord.changeset(%{finished_at: DateTime.utc_now()})
             |> repo.update!()
-
-            # Check if any jobs were discarded (finished with error)
-            discarded_count =
-              Job
-              |> Job.with_batch_id(batch_id)
-              |> Job.discarded()
-              |> repo.aggregate(:count, :id)
-
-            # Emit telemetry for batch completion
-            GoodJob.Telemetry.batch_complete(batch, discarded_count)
-
-            # Execute callbacks
-            if discarded_count > 0 && batch.on_discard do
-              execute_callback(
-                batch.on_discard,
-                batch,
-                :discard,
-                batch.callback_queue_name,
-                batch.callback_priority
-              )
-            end
-
-            if discarded_count == 0 && batch.on_success do
-              execute_callback(
-                batch.on_success,
-                batch,
-                :success,
-                batch.callback_queue_name,
-                batch.callback_priority
-              )
-            end
-
-            if batch.on_finish do
-              execute_callback(
-                batch.on_finish,
-                batch,
-                :finish,
-                batch.callback_queue_name,
-                batch.callback_priority
-              )
-            end
           end
       end
     end)
+  end
+
+  defp unfinished_jobs_count(repo, batch_id) do
+    Job
+    |> Job.with_batch_id(batch_id)
+    |> Job.unfinished()
+    |> repo.aggregate(:count, :id)
+  end
+
+  defp discarded_jobs_count(repo, batch_id) do
+    Job
+    |> Job.with_batch_id(batch_id)
+    |> Job.discarded()
+    |> repo.aggregate(:count, :id)
+  end
+
+  defp unfinished_callback_jobs_count(repo, batch_id) do
+    import Ecto.Query
+
+    from(j in Job, where: j.batch_callback_id == ^batch_id, where: is_nil(j.finished_at))
+    |> repo.aggregate(:count, :id)
+  end
+
+  defp jobs_finished?(batch) do
+    not is_nil(batch.jobs_finished_at) || not is_nil(batch.finished_at)
   end
 
   defp execute_callback(callback_string, batch, event, queue, priority) when is_binary(callback_string) do
