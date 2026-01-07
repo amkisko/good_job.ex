@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## 0.2.0
+
+- Update dependencies to the latest supported versions
+
 ## 0.1.1
 
 - Align Elixir execution semantics with Ruby GoodJob protocol handling
