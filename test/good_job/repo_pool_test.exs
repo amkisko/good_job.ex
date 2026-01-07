@@ -1,117 +1,54 @@
 defmodule GoodJob.RepoPoolTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case
 
   alias GoodJob.RepoPool
+  alias GoodJob.Repo
 
-  describe "recommended_pool_size/0" do
-    test "returns base size based on max_processes" do
-      size = RepoPool.recommended_pool_size()
-      assert is_integer(size)
-      assert size >= 2
-    end
+  setup do
+    original_config = Application.get_env(:good_job, :config, %{})
 
-    test "uses database_pool_size when configured" do
-      original_config = Application.get_env(:good_job, :config, %{})
+    on_exit(fn ->
+      Application.put_env(:good_job, :config, original_config)
+    end)
 
-      # Set a custom database_pool_size
-      Application.put_env(
-        :good_job,
-        :config,
-        Map.merge(original_config, %{
-          database_pool_size: 20
-        })
-      )
+    Application.put_env(:good_job, :config, Map.put(original_config, :repo, GoodJob.TestRepo))
 
-      try do
-        size = RepoPool.recommended_pool_size()
-        assert is_integer(size)
-        # Should use the configured size if it's >= base_size
-        assert size >= 20
-      after
-        Application.put_env(:good_job, :config, original_config)
-      end
-    end
-
-    test "uses max of database_pool_size and base_size" do
-      original_config = Application.get_env(:good_job, :config, %{})
-      max_processes = GoodJob.Config.max_processes()
-      base_size = max_processes + 2
-
-      # Set a smaller database_pool_size - should use base_size
-      Application.put_env(
-        :good_job,
-        :config,
-        Map.merge(original_config, %{
-          database_pool_size: 1
-        })
-      )
-
-      try do
-        size = RepoPool.recommended_pool_size()
-        assert is_integer(size)
-        # Should use max(base_size, configured_size)
-        assert size >= base_size
-      after
-        Application.put_env(:good_job, :config, original_config)
-      end
-    end
+    :ok
   end
 
-  describe "total_connections_needed/0" do
-    test "returns total connections including notifier" do
-      total = RepoPool.total_connections_needed()
-      assert is_integer(total)
-      assert total >= RepoPool.recommended_pool_size()
-    end
+  test "recommended_pool_size uses max_processes and database_pool_size" do
+    Application.put_env(:good_job, :config, %{repo: GoodJob.TestRepo, max_processes: 3})
+    assert RepoPool.recommended_pool_size() == 5
+
+    Application.put_env(:good_job, :config, %{repo: GoodJob.TestRepo, max_processes: 3, database_pool_size: 10})
+    assert RepoPool.recommended_pool_size() == 10
   end
 
-  describe "configure_repo/1" do
-    test "returns :ok" do
-      result = RepoPool.configure_repo(GoodJob.TestRepo)
-      assert result == :ok
-    end
+  test "total_connections_needed accounts for notifier pool size" do
+    Application.put_env(:good_job, :config, %{repo: GoodJob.TestRepo, max_processes: 2, notifier_pool_size: 2})
+    assert RepoPool.total_connections_needed() == 6
   end
 
-  describe "set_timeouts/1" do
-    test "returns :ok when timeouts are nil" do
-      # This function is meant to be called by Postgrex in after_connect
-      # We test the logic path when timeouts are not configured
-      # In practice, users configure this in their Repo's after_connect callback
+  test "set_timeouts applies configured statement and lock timeouts" do
+    Application.put_env(:good_job, :config, %{
+      repo: GoodJob.TestRepo,
+      database_statement_timeout: 1_000,
+      database_lock_timeout: 500
+    })
 
-      # Mock a connection struct - we can't easily test with real Postgrex connection
-      # but we can verify the function structure
-      _conn = %{__struct__: :postgrex_connection}
+    repo = Repo.repo()
+    conn_opts =
+      repo.config()
+      |> Keyword.take([:hostname, :username, :password, :database, :port, :ssl, :ssl_opts, :socket_dir])
+      |> Enum.reject(fn {_, value} -> is_nil(value) end)
 
-      # Temporarily set timeouts to nil to test that path
-      original_config = Application.get_env(:good_job, :config, %{})
-
-      Application.put_env(
-        :good_job,
-        :config,
-        Map.merge(original_config, %{
-          database_statement_timeout: nil,
-          database_lock_timeout: nil
-        })
-      )
-
-      try do
-        # The function checks for nil timeouts and returns early
-        # We can't easily test the Postgrex.query! call without a real connection
-        # but we can verify the function exists and has the right signature
-        assert function_exported?(RepoPool, :set_timeouts, 1)
-      rescue
-        _ -> :ok
-      after
-        Application.put_env(:good_job, :config, original_config)
+    {:ok, conn} = Postgrex.start_link(conn_opts)
+    on_exit(fn ->
+      if Process.alive?(conn) do
+        GenServer.stop(conn)
       end
-    end
+    end)
 
-    test "function exists and can be called" do
-      # Verify the function exists and has correct arity
-      assert function_exported?(RepoPool, :set_timeouts, 1)
-      assert function_exported?(RepoPool, :recommended_pool_size, 0)
-      assert function_exported?(RepoPool, :total_connections_needed, 0)
-      assert function_exported?(RepoPool, :configure_repo, 1)
-    end
+    assert :ok == RepoPool.set_timeouts(conn)
   end
 end

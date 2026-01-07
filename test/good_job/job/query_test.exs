@@ -1,4 +1,4 @@
-defmodule GoodJob.JobQueryTest do
+defmodule GoodJob.Job.QueryTest do
   use ExUnit.Case, async: false
 
   alias GoodJob.{Job, Repo}
@@ -237,6 +237,24 @@ defmodule GoodJob.JobQueryTest do
     test "order_by_finished_desc/1 orders by finished desc" do
       Ecto.Adapters.SQL.Sandbox.checkout(Repo.repo())
       query = Job.order_by_finished_desc()
+      assert %Ecto.Query{} = query
+    end
+
+    test "advisory_locked/1 returns query for advisory locked jobs" do
+      Ecto.Adapters.SQL.Sandbox.checkout(Repo.repo())
+      query = Job.advisory_locked()
+      assert %Ecto.Query{} = query
+    end
+
+    test "advisory_unlocked/1 returns query for advisory unlocked jobs" do
+      Ecto.Adapters.SQL.Sandbox.checkout(Repo.repo())
+      query = Job.advisory_unlocked()
+      assert %Ecto.Query{} = query
+    end
+
+    test "joins_advisory_locks/1 joins with pg_locks" do
+      Ecto.Adapters.SQL.Sandbox.checkout(Repo.repo())
+      query = Job.joins_advisory_locks()
       assert %Ecto.Query{} = query
     end
   end

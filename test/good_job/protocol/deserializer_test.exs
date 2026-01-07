@@ -223,7 +223,7 @@ defmodule GoodJob.Protocol.DeserializerTest do
           "_aj_symbol_keys" => ["key1"],
           "_aj_ruby2_keywords" => [],
           "_aj_hash_with_indifferent_access" => true,
-          "_aj_globalid" => "gid://",
+          "_aj_globalid" => "gid://myapp/User/123",
           "_aj_serialized" => "data",
           "key1" => "value1",
           "normal_key" => "value"
@@ -235,6 +235,22 @@ defmodule GoodJob.Protocol.DeserializerTest do
       refute Map.has_key?(normalized, "_aj_symbol_keys")
       refute Map.has_key?(normalized, "_aj_ruby2_keywords")
       refute Map.has_key?(normalized, "_aj_hash_with_indifferent_access")
+      # Note: _aj_globalid is handled in Serialization.deserialize_argument, not deleted here
+    end
+
+    test "handles GlobalID in arguments" do
+      args = [
+        %{
+          "user" => %{"_aj_globalid" => "gid://myapp/User/123"},
+          "action" => "process"
+        }
+      ]
+
+      normalized = Deserializer.normalize_args_for_elixir(TestJob, args, %{})
+      assert is_map(normalized)
+
+      user = Map.get(normalized, "user") || Map.get(normalized, :user)
+      assert %{__struct__: :global_id, app: "myapp", model: "User", id: "123"} = user
     end
   end
 end

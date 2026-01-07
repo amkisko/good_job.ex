@@ -1,55 +1,32 @@
 defmodule GoodJob.PubSubTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case
 
   alias GoodJob.PubSub
 
-  describe "broadcast/2" do
-    test "broadcasts job_created event" do
-      result = PubSub.broadcast(:job_created, "job-123")
-      assert result in [:ok, :noop]
-    end
+  setup do
+    original_pubsub_server = Application.get_env(:good_job, :pubsub_server)
+    original_config = Application.get_env(:good_job, :config, %{})
 
-    test "broadcasts job_updated event" do
-      result = PubSub.broadcast(:job_updated, "job-123")
-      assert result in [:ok, :noop]
-    end
+    on_exit(fn ->
+      Application.put_env(:good_job, :pubsub_server, original_pubsub_server)
+      Application.put_env(:good_job, :config, original_config)
+    end)
 
-    test "broadcasts job_completed event" do
-      result = PubSub.broadcast(:job_completed, "job-123")
-      assert result in [:ok, :noop]
-    end
-
-    test "broadcasts job_deleted event" do
-      result = PubSub.broadcast(:job_deleted, "job-123")
-      assert result in [:ok, :noop]
-    end
-
-    test "broadcasts job_retried event" do
-      result = PubSub.broadcast(:job_retried, "job-123")
-      assert result in [:ok, :noop]
-    end
-
-    test "broadcasts job_discarded event" do
-      result = PubSub.broadcast(:job_discarded, "job-123")
-      assert result in [:ok, :noop]
-    end
+    :ok
   end
 
-  describe "subscribe/1" do
-    test "subscribes to events" do
-      result = PubSub.subscribe()
-      assert result in ["good_job:jobs", nil]
-    end
+  test "broadcasts and subscribes when pubsub is configured" do
+    {:ok, _pid} = start_supervised({Phoenix.PubSub, name: GoodJobPubSubTest})
+    Application.put_env(:good_job, :pubsub_server, GoodJobPubSubTest)
 
-    test "subscribes with nil server" do
-      result = PubSub.subscribe(nil)
-      assert result in ["good_job:jobs", nil]
-    end
+    topic = PubSub.subscribe()
+    assert topic == "good_job:jobs"
 
-    test "get_pubsub_server returns nil when not configured" do
-      # Test the private function indirectly through subscribe
-      result = PubSub.subscribe()
-      assert result in ["good_job:jobs", nil]
-    end
+    assert :ok == PubSub.broadcast(:job_created, "job-1")
+    assert_receive {:job_created, "job-1"}
+  end
+
+  test "broadcast returns :noop for unknown events" do
+    assert PubSub.broadcast(:unknown_event, "job-1") == :noop
   end
 end

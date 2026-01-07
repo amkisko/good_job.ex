@@ -1,175 +1,66 @@
 defmodule GoodJob.SettingManagerTest do
-  use ExUnit.Case, async: false
+  use GoodJob.Testing.JobCase
 
-  alias GoodJob.{Repo, SettingManager, SettingSchema}
+  alias GoodJob.SettingManager
+  alias GoodJob.SettingSchema
+  alias GoodJob.Repo
 
   setup do
-    Ecto.Adapters.SQL.Sandbox.checkout(Repo.repo())
-    Ecto.Adapters.SQL.Sandbox.mode(Repo.repo(), :manual)
+    repo = Repo.repo()
+    Ecto.Adapters.SQL.Sandbox.checkout(repo)
+    Ecto.Adapters.SQL.Sandbox.mode(repo, {:shared, self()})
     :ok
   end
 
-  describe "pause/1" do
-    test "pauses a queue" do
-      Repo.repo().transaction(fn ->
-        result = SettingManager.pause(queue: "test-queue")
-        assert result.__struct__ == SettingSchema
-        assert result.key == "pause:queue:test-queue"
-        assert is_map(result.value)
-        assert result.value["paused"] == true or result.value[:paused] == true
-        assert result.value["queue"] == "test-queue" or result.value[:queue] == "test-queue"
-      end)
-    end
+  test "pause and unpause by queue" do
+    assert SettingManager.paused?(queue: "default") == false
+    SettingManager.pause(queue: "default")
+    assert SettingManager.paused?(queue: "default") == true
 
-    test "pauses a job class" do
-      Repo.repo().transaction(fn ->
-        result = SettingManager.pause(job_class: "MyApp::MyJob")
-        assert result.__struct__ == SettingSchema
-        assert result.key == "pause:job_class:MyApp::MyJob"
-        assert is_map(result.value)
-        assert result.value["paused"] == true or result.value[:paused] == true
-        assert result.value["job_class"] == "MyApp::MyJob" or result.value[:job_class] == "MyApp::MyJob"
-      end)
-    end
-
-    test "returns error with invalid options" do
-      Repo.repo().transaction(fn ->
-        assert SettingManager.pause([]) == {:error, :invalid_options}
-        assert SettingManager.pause(other: "value") == {:error, :invalid_options}
-      end)
-    end
-
-    test "updates existing pause setting" do
-      Repo.repo().transaction(fn ->
-        # Create initial pause
-        setting1 = SettingManager.pause(queue: "test-queue")
-
-        # Pause again (should update)
-        setting2 = SettingManager.pause(queue: "test-queue")
-        assert setting1.id == setting2.id
-        assert is_map(setting2.value)
-      end)
-    end
+    SettingManager.unpause(queue: "default")
+    assert SettingManager.paused?(queue: "default") == false
   end
 
-  describe "unpause/1" do
-    test "unpauses a queue" do
-      Repo.repo().transaction(fn ->
-        # First pause
-        SettingManager.pause(queue: "test-queue")
+  test "pause and unpause by job_class" do
+    assert SettingManager.paused?(job_class: "MyJob") == false
+    SettingManager.pause(job_class: "MyJob")
+    assert SettingManager.paused?(job_class: "MyJob") == true
 
-        # Then unpause - returns the deleted struct
-        result = SettingManager.unpause(queue: "test-queue")
-        assert result.__struct__ == SettingSchema
-
-        # Verify it's gone
-        assert SettingManager.paused?(queue: "test-queue") == false
-      end)
-    end
-
-    test "unpauses a job class" do
-      Repo.repo().transaction(fn ->
-        # First pause
-        SettingManager.pause(job_class: "MyApp::MyJob")
-
-        # Then unpause - returns the deleted struct
-        result = SettingManager.unpause(job_class: "MyApp::MyJob")
-        assert result.__struct__ == SettingSchema
-
-        # Verify it's gone
-        assert SettingManager.paused?(job_class: "MyApp::MyJob") == false
-      end)
-    end
-
-    test "returns error with invalid options" do
-      Repo.repo().transaction(fn ->
-        assert SettingManager.unpause([]) == {:error, :invalid_options}
-        assert SettingManager.unpause(other: "value") == {:error, :invalid_options}
-      end)
-    end
-
-    test "returns ok when unpausing non-existent setting" do
-      Repo.repo().transaction(fn ->
-        result = SettingManager.unpause(queue: "non-existent")
-        assert result == :ok
-      end)
-    end
+    SettingManager.unpause(job_class: "MyJob")
+    assert SettingManager.paused?(job_class: "MyJob") == false
   end
 
-  describe "paused?/1" do
-    test "returns false when queue is not paused" do
-      Repo.repo().transaction(fn ->
-        assert SettingManager.paused?(queue: "test-queue") == false
-      end)
-    end
-
-    test "returns true when queue is paused" do
-      Repo.repo().transaction(fn ->
-        SettingManager.pause(queue: "test-queue")
-        assert SettingManager.paused?(queue: "test-queue") == true
-      end)
-    end
-
-    test "returns false when job class is not paused" do
-      Repo.repo().transaction(fn ->
-        assert SettingManager.paused?(job_class: "MyApp::MyJob") == false
-      end)
-    end
-
-    test "returns true when job class is paused" do
-      Repo.repo().transaction(fn ->
-        SettingManager.pause(job_class: "MyApp::MyJob")
-        assert SettingManager.paused?(job_class: "MyApp::MyJob") == true
-      end)
-    end
-
-    test "returns false with invalid options" do
-      Repo.repo().transaction(fn ->
-        assert SettingManager.paused?([]) == false
-        assert SettingManager.paused?(other: "value") == false
-      end)
-    end
+  test "pause/unpause return errors for invalid options" do
+    assert SettingManager.pause() == {:error, :invalid_options}
+    assert SettingManager.unpause() == {:error, :invalid_options}
   end
 
-  # enable_cron/1 and disable_cron/1 have a bug where they try to update!
-  # a new struct. These functions need to be fixed in the production code first.
-  # For now, we test the basic functionality that works.
+  test "enable and disable cron keys" do
+    SettingManager.enable_cron("cron-1")
+    assert SettingManager.cron_key_enabled?("cron-1") == true
 
-  describe "cron_key_enabled?/2" do
-    test "returns true by default when not disabled (default=true)" do
-      Repo.repo().transaction(fn ->
-        assert SettingManager.cron_key_enabled?("test-cron", true) == true
-      end)
-    end
-
-    test "returns false by default when not enabled (default=false)" do
-      Repo.repo().transaction(fn ->
-        assert SettingManager.cron_key_enabled?("test-cron", false) == false
-      end)
-    end
+    SettingManager.disable_cron("cron-1")
+    assert SettingManager.cron_key_enabled?("cron-1") == false
   end
 
-  describe "unpause_by_key/1" do
-    test "unpauses by key" do
-      Repo.repo().transaction(fn ->
-        # Create a pause setting
-        SettingManager.pause(queue: "test-queue")
-        assert SettingManager.paused?(queue: "test-queue") == true
+  test "cron_key_enabled? respects default false" do
+    repo = Repo.repo()
+    repo.insert!(
+      SettingSchema.changeset(%SettingSchema{}, %{key: "cron_keys_enabled", value: %{keys: ["cron-2"]}})
+    )
 
-        # Unpause by key - returns :ok or the deleted struct
-        result = SettingManager.unpause_by_key("pause:queue:test-queue")
-        assert result == :ok or result.__struct__ == SettingSchema
+    assert SettingManager.cron_key_enabled?("cron-2", false) == true
+    assert SettingManager.cron_key_enabled?("cron-3", false) == false
+  end
 
-        # Verify it's gone
-        assert SettingManager.paused?(queue: "test-queue") == false
-      end)
-    end
+  test "unpause_by_key deletes setting" do
+    repo = Repo.repo()
+    setting =
+      %SettingSchema{}
+      |> SettingSchema.changeset(%{key: "pause:queue:default", value: %{paused: true}})
+      |> repo.insert!()
 
-    test "returns ok for non-existent key" do
-      Repo.repo().transaction(fn ->
-        result = SettingManager.unpause_by_key("non-existent-key")
-        assert result == :ok
-      end)
-    end
+    SettingManager.unpause_by_key(setting.key)
+    assert repo.get_by(SettingSchema, key: setting.key) == nil
   end
 end

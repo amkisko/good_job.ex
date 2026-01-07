@@ -1,4 +1,4 @@
-defmodule GoodJob.JobMacroTest do
+defmodule GoodJob.JobTest do
   use ExUnit.Case, async: false
   use GoodJob.Testing.JobCase
 

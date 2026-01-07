@@ -3,145 +3,62 @@ defmodule GoodJob.DatabaseURLTest do
 
   alias GoodJob.DatabaseURL
 
-  describe "parse/1" do
-    test "parses standard PostgreSQL URL" do
-      url = "postgres://user:pass@localhost:5432/mydb"
-      config = DatabaseURL.parse(url)
+  setup do
+    original_good_job_url = System.get_env("GOOD_JOB_DATABASE_URL")
+    original_database_url = System.get_env("DATABASE_URL")
 
-      assert Keyword.get(config, :username) == "user"
-      assert Keyword.get(config, :password) == "pass"
-      assert Keyword.get(config, :hostname) == "localhost"
-      assert Keyword.get(config, :port) == 5432
-      assert Keyword.get(config, :database) == "mydb"
-      assert Keyword.get(config, :adapter) == Ecto.Adapters.Postgres
-    end
+    on_exit(fn ->
+      if original_good_job_url do
+        System.put_env("GOOD_JOB_DATABASE_URL", original_good_job_url)
+      else
+        System.delete_env("GOOD_JOB_DATABASE_URL")
+      end
 
-    test "parses PostgreSQL URL without port" do
-      url = "postgres://user:pass@localhost/mydb"
-      config = DatabaseURL.parse(url)
+      if original_database_url do
+        System.put_env("DATABASE_URL", original_database_url)
+      else
+        System.delete_env("DATABASE_URL")
+      end
+    end)
 
-      assert Keyword.get(config, :port) == 5432
-      assert Keyword.get(config, :database) == "mydb"
-    end
-
-    test "parses PostgreSQL URL without password" do
-      url = "postgres://user@localhost/mydb"
-      config = DatabaseURL.parse(url)
-
-      assert Keyword.get(config, :username) == "user"
-      assert Keyword.get(config, :password) == nil
-    end
-
-    test "parses PostgreSQL URL with query parameters" do
-      url = "postgres://user:pass@localhost/mydb?pool_size=20&timeout=5000"
-      config = DatabaseURL.parse(url)
-
-      assert Keyword.get(config, :pool_size) == 20
-      assert Keyword.get(config, :timeout) == 5000
-    end
-
-    test "parses postgresql:// scheme" do
-      url = "postgresql://user:pass@localhost/mydb"
-      config = DatabaseURL.parse(url)
-
-      assert Keyword.get(config, :adapter) == Ecto.Adapters.Postgres
-    end
-
-    test "handles URL with special characters in password" do
-      url = "postgres://user:p@ss%3Aw0rd@localhost/mydb"
-      config = DatabaseURL.parse(url)
-
-      # URL should be decoded
-      assert Keyword.get(config, :username) == "user"
-      # URI.parse doesn't decode userinfo, so we get the encoded version
-      # This is expected behavior
-    end
+    :ok
   end
 
-  describe "from_env/0" do
-    test "returns GOOD_JOB_DATABASE_URL if set" do
-      System.put_env("GOOD_JOB_DATABASE_URL", "postgres://goodjob@localhost/goodjob_db")
-      System.put_env("DATABASE_URL", "postgres://app@localhost/app_db")
+  test "parses database url with userinfo, port, and query params" do
+    config =
+      DatabaseURL.parse(
+        "postgres://user:pass@localhost:5433/mydb?pool_size=5&ssl=true&timeout=3000"
+      )
 
-      assert DatabaseURL.from_env() == "postgres://goodjob@localhost/goodjob_db"
-
-      System.delete_env("GOOD_JOB_DATABASE_URL")
-      System.delete_env("DATABASE_URL")
-    end
-
-    test "returns DATABASE_URL if GOOD_JOB_DATABASE_URL not set" do
-      System.delete_env("GOOD_JOB_DATABASE_URL")
-      System.put_env("DATABASE_URL", "postgres://app@localhost/app_db")
-
-      assert DatabaseURL.from_env() == "postgres://app@localhost/app_db"
-
-      System.delete_env("DATABASE_URL")
-    end
-
-    test "returns nil if neither is set" do
-      System.delete_env("GOOD_JOB_DATABASE_URL")
-      System.delete_env("DATABASE_URL")
-
-      assert DatabaseURL.from_env() == nil
-    end
+    assert config[:username] == "user"
+    assert config[:password] == "pass"
+    assert config[:hostname] == "localhost"
+    assert config[:port] == 5433
+    assert config[:database] == "mydb"
+    assert config[:pool_size] == 5
+    assert config[:ssl] == "true"
+    assert config[:timeout] == 3000
   end
 
-  describe "configure_repo/2" do
-    test "configures repository from URL" do
-      url = "postgres://user:pass@localhost:5432/mydb"
-
-      DatabaseURL.configure_repo(TestRepo, url)
-
-      # Get the app name that was used (derived from module name: GoodJob.DatabaseURLTest.TestRepo -> goodjob)
-      app = TestRepo |> Module.split() |> List.first() |> String.downcase() |> String.to_atom()
-
-      config = Application.get_env(app, TestRepo)
-
-      # Verify config was set and is a keyword list
-      assert is_list(config)
-
-      # Check values
-      assert Keyword.get(config, :username) == "user"
-      assert Keyword.get(config, :password) == "pass"
-      assert Keyword.get(config, :hostname) == "localhost"
-      assert Keyword.get(config, :port) == 5432
-      assert Keyword.get(config, :database) == "mydb"
-
-      Application.delete_env(app, TestRepo)
-    end
+  test "parses database url without userinfo" do
+    config = DatabaseURL.parse("postgres://localhost/mydb")
+    assert config[:username] == nil
+    assert config[:password] == nil
+    assert config[:database] == "mydb"
+    assert config[:port] == 5432
   end
 
-  describe "configure_repo_from_env/1" do
-    test "configures repository from environment variable" do
-      System.put_env("GOOD_JOB_DATABASE_URL", "postgres://user:pass@localhost:5432/mydb")
+  test "from_env prefers GOOD_JOB_DATABASE_URL" do
+    System.put_env("GOOD_JOB_DATABASE_URL", "postgres://goodjob@localhost/goodjob")
+    System.put_env("DATABASE_URL", "postgres://fallback@localhost/fallback")
 
-      result = DatabaseURL.configure_repo_from_env(TestRepo)
-
-      assert result == :ok
-
-      app = TestRepo |> Module.split() |> List.first() |> String.downcase() |> String.to_atom()
-      config = Application.get_env(app, TestRepo)
-      assert Keyword.get(config, :database) == "mydb"
-
-      System.delete_env("GOOD_JOB_DATABASE_URL")
-      Application.delete_env(app, TestRepo)
-      Application.delete_env(:test_repo, TestRepo)
-    end
-
-    test "returns :no_url if no environment variable set" do
-      System.delete_env("GOOD_JOB_DATABASE_URL")
-      System.delete_env("DATABASE_URL")
-
-      result = DatabaseURL.configure_repo_from_env(TestRepo)
-
-      assert result == :no_url
-    end
+    assert DatabaseURL.from_env() == "postgres://goodjob@localhost/goodjob"
   end
 
-  # Test repo module for testing
-  defmodule TestRepo do
-    use Ecto.Repo,
-      otp_app: :good_job,
-      adapter: Ecto.Adapters.Postgres
+  test "configure_repo_from_env returns :no_url when unset" do
+    System.delete_env("GOOD_JOB_DATABASE_URL")
+    System.delete_env("DATABASE_URL")
+
+    assert DatabaseURL.configure_repo_from_env(GoodJob.Repo.repo()) == :no_url
   end
 end

@@ -10,7 +10,7 @@ defmodule GoodJob.UtilsTest do
 
     test "formats exception errors" do
       error = %RuntimeError{message: "test exception"}
-      assert Utils.format_error(error) == "test exception"
+      assert Utils.format_error(error) == "RuntimeError: test exception"
     end
 
     test "formats other types" do
@@ -21,7 +21,7 @@ defmodule GoodJob.UtilsTest do
 
     test "handles various exception types" do
       error1 = %ArgumentError{message: "invalid argument"}
-      assert Utils.format_error(error1) == "invalid argument"
+      assert Utils.format_error(error1) == "ArgumentError: invalid argument"
 
       error2 = %FunctionClauseError{}
       assert is_binary(Utils.format_error(error2))

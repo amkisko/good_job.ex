@@ -12,6 +12,38 @@ defmodule GoodJob.Config.ValidationTest do
   }
 
   describe "validate!/1" do
+    test "raises error when repo is missing" do
+      config = Map.delete(@base_config, :repo)
+
+      assert_raise RuntimeError, ~r/GoodJob repo not configured/, fn ->
+        Validation.validate!(config)
+      end
+    end
+
+    test "raises error when execution_mode is invalid" do
+      config = Map.put(@base_config, :execution_mode, :unknown)
+
+      assert_raise ArgumentError, ~r/execution_mode must be one of/, fn ->
+        Validation.validate!(config)
+      end
+    end
+
+    test "raises error when max_processes is invalid" do
+      config = Map.put(@base_config, :max_processes, 0)
+
+      assert_raise ArgumentError, ~r/max_processes must be a positive integer/, fn ->
+        Validation.validate!(config)
+      end
+    end
+
+    test "raises error when plugins contain unavailable module" do
+      config = Map.put(@base_config, :plugins, [{NonExistentPlugin, []}])
+
+      assert_raise ArgumentError, ~r/plugin module/, fn ->
+        Validation.validate!(config)
+      end
+    end
+
     test "validates external_jobs is a map" do
       config = Map.put(@base_config, :external_jobs, %{"External::Job" => MyApp.Job})
 
