@@ -242,7 +242,8 @@ defmodule GoodJob.Scheduler do
     end
   end
 
-  defp wait_for_tasks_loop(running_tasks, timeout_ms, scheduler_pid) do
+  @doc false
+  def wait_for_tasks_loop(running_tasks, timeout_ms, scheduler_pid) do
     if map_size(running_tasks) == 0 do
       :ok
     else

@@ -1,7 +1,7 @@
 defmodule GoodJob.ConcurrencyTest do
   use ExUnit.Case, async: false
 
-  alias GoodJob.{Concurrency, Job, Repo}
+  alias GoodJob.{Concurrency, Execution, Job, Repo}
 
   setup do
     _pid = Ecto.Adapters.SQL.Sandbox.checkout(Repo.repo())
@@ -98,24 +98,52 @@ defmodule GoodJob.ConcurrencyTest do
 
     test "returns error when throttle exceeded" do
       Ecto.Adapters.SQL.Sandbox.checkout(Repo.repo())
-      job_id = Ecto.UUID.generate()
 
-      # Create jobs within throttle period
-      cutoff = DateTime.add(DateTime.utc_now(), -30, :second)
+      # Create executions within throttle period
+      for _i <- 1..5 do
+        active_job_id = Ecto.UUID.generate()
 
-      for i <- 1..6 do
         Job.enqueue(%{
-          active_job_id: Ecto.UUID.generate(),
+          active_job_id: active_job_id,
           job_class: "TestJob",
           queue_name: "default",
           serialized_params: %{"arguments" => []},
-          concurrency_key: "test-key",
-          inserted_at: DateTime.add(cutoff, i, :second)
+          concurrency_key: "test-key"
         })
+
+        %Execution{}
+        |> Execution.changeset(%{
+          active_job_id: active_job_id,
+          job_class: "TestJob",
+          queue_name: "default",
+          serialized_params: %{"arguments" => []}
+        })
+        |> Repo.repo().insert!()
       end
 
+      Process.sleep(2)
+
+      active_job_id = Ecto.UUID.generate()
+
+      Job.enqueue(%{
+        active_job_id: active_job_id,
+        job_class: "TestJob",
+        queue_name: "default",
+        serialized_params: %{"arguments" => []},
+        concurrency_key: "test-key"
+      })
+
+      %Execution{}
+      |> Execution.changeset(%{
+        active_job_id: active_job_id,
+        job_class: "TestJob",
+        queue_name: "default",
+        serialized_params: %{"arguments" => []}
+      })
+      |> Repo.repo().insert!()
+
       config = %{perform_throttle: {5, 60}}
-      result = Concurrency.check_perform_limit("test-key", job_id, config)
+      result = Concurrency.check_perform_limit("test-key", active_job_id, config)
       assert match?({:ok, {:error, :throttle_exceeded}}, result)
     end
   end

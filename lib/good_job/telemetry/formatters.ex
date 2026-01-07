@@ -54,8 +54,12 @@ defmodule GoodJob.Telemetry.Formatters do
   Builds a log message for generic events.
   """
   def build_generic_log_message(:cron, :enqueue, _measure, meta) do
-    "[GoodJob] Cron job enqueued: #{meta.job_class} " <>
-      "(cron: #{meta.cron}, key: #{meta.cron_key})"
+    job_class = Map.get(meta, :job_class, "unknown")
+    cron = Map.get(meta, :cron, "unknown")
+    cron_key = Map.get(meta, :cron_key, "unknown")
+
+    "[GoodJob] Cron job enqueued: #{job_class} " <>
+      "(cron: #{cron}, key: #{cron_key})"
   end
 
   def build_generic_log_message(:notifier, :listen, _measure, _meta) do
