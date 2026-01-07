@@ -25,7 +25,7 @@ defmodule GoodJob.Job.Query do
   end
 
   @doc """
-  Returns a query for unlocked jobs.
+  Returns a query for unlocked jobs (using locked_by_id as proxy).
   """
   @spec unlocked(Ecto.Query.t() | module()) :: Ecto.Query.t()
   def unlocked(query \\ Job) do
@@ -33,11 +33,63 @@ defmodule GoodJob.Job.Query do
   end
 
   @doc """
-  Returns a query for locked jobs.
+  Returns a query for locked jobs (using locked_by_id as proxy).
   """
   @spec locked(Ecto.Query.t() | module()) :: Ecto.Query.t()
   def locked(query \\ Job) do
     where(query, [j], not is_nil(j.locked_by_id))
+  end
+
+  @doc """
+  Joins with pg_locks to check advisory locks on jobs.
+  """
+  @spec joins_advisory_locks(Ecto.Query.t() | module()) :: Ecto.Query.t()
+  def joins_advisory_locks(query \\ Job) do
+    table_name = "good_jobs"
+
+    from(j in query,
+      left_join:
+        l in fragment("""
+        pg_locks
+        """),
+      on:
+        fragment(
+          """
+          ?.locktype = 'advisory'
+            AND ?.objsubid = 1
+            AND ?.classid = ('x' || substr(md5(? || '-' || ?::text), 1, 16))::bit(32)::int
+            AND ?.objid = (('x' || substr(md5(? || '-' || ?::text), 1, 16))::bit(64) << 32)::bit(32)::int
+          """,
+          l,
+          l,
+          l,
+          ^table_name,
+          fragment("?::text", j.id),
+          l,
+          ^table_name,
+          fragment("?::text", j.id)
+        )
+    )
+  end
+
+  @doc """
+  Returns a query for jobs that are advisory unlocked (no advisory lock in pg_locks).
+  """
+  @spec advisory_unlocked(Ecto.Query.t() | module()) :: Ecto.Query.t()
+  def advisory_unlocked(query \\ Job) do
+    query
+    |> joins_advisory_locks()
+    |> where([j, l], is_nil(l.locktype))
+  end
+
+  @doc """
+  Returns a query for jobs that are advisory locked (have advisory lock in pg_locks).
+  """
+  @spec advisory_locked(Ecto.Query.t() | module()) :: Ecto.Query.t()
+  def advisory_locked(query \\ Job) do
+    query
+    |> joins_advisory_locks()
+    |> where([j, l], not is_nil(l.locktype))
   end
 
   @doc """
