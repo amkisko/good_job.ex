@@ -168,7 +168,7 @@ config :good_job,
   repo: HabitTracker.Repo,
   execution_mode: :async,
   max_processes: 5,
-  poll_interval: 10,
+  poll_interval: 30,
   queues: "*",
   enable_listen_notify: true,
   enable_cron: true,
@@ -319,4 +319,3 @@ Assets are automatically watched when running `mix phx.server` in development mo
 ## License
 
 This example application is provided as-is for demonstration purposes.
-

@@ -36,7 +36,7 @@ defmodule MonorepoExampleWeb.Layouts do
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="csrf-token" content={@csrf_token} />
         <title>LiveDashboard</title>
-        <link phx-track-static rel="stylesheet" href={Routes.static_path(MonorepoExampleWeb.Endpoint, "/assets/css/app.css")} />
+        <link phx-track-static rel="stylesheet" href={~p"/assets/css/app.css"} />
         <style>
           /* Minimal CSS for GoodJob LiveDashboard components */
           .good-job-dashboard {

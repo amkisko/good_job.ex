@@ -48,8 +48,8 @@ defmodule GoodJob.MixProject do
   defp deps do
     [
       # Database
-      {:ecto_sql, "~> 3.10"},
-      {:postgrex, "~> 0.20"},
+      {:ecto_sql, "~> 3.13"},
+      {:postgrex, "~> 0.21"},
 
       # JSON
       {:jason, "~> 1.4"},
@@ -58,21 +58,21 @@ defmodule GoodJob.MixProject do
       {:telemetry, "~> 1.3"},
 
       # Phoenix dependencies (optional, for Phoenix integration)
-      {:phoenix, "~> 1.7", optional: true},
-      {:phoenix_live_view, "~> 0.20", optional: true},
-      {:phoenix_html, "~> 4.0", optional: true},
-      {:plug, "~> 1.14", optional: true},
-      {:plug_cowboy, "~> 2.6", optional: true},
+      {:phoenix, "~> 1.8", optional: true},
+      {:phoenix_live_view, "~> 1.1", optional: true},
+      {:phoenix_html, "~> 4.3", optional: true},
+      {:plug, "~> 1.19", optional: true},
+      {:plug_cowboy, "~> 2.7", optional: true},
 
       # Testing
-      {:stream_data, "~> 1.0", only: :test},
+      {:stream_data, "~> 1.2", only: :test},
 
       # Code quality
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
-      {:ex_doc, "~> 0.31", only: :dev, runtime: false},
+      {:ex_doc, "~> 0.39", only: :dev, runtime: false},
       {:excoveralls, "~> 0.18", only: :test, runtime: false},
-      {:benchee, "~> 1.0", only: :dev, runtime: false},
+      {:benchee, "~> 1.5", only: :dev, runtime: false},
       {:benchee_html, "~> 1.0", only: :dev, runtime: false}
     ]
   end

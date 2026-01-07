@@ -36,7 +36,7 @@ config :good_job, :config,
   repo: HabitTracker.Repo,
   execution_mode: :async,
   max_processes: 5,
-  poll_interval: 10,
+  poll_interval: 30,
   # Queue configuration examples:
   #   "*" - all queues with default concurrency
   #   "queue1:5,queue2:10" - comma-separated with concurrency

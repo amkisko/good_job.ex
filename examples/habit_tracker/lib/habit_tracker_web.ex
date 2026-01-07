@@ -6,10 +6,17 @@ defmodule HabitTrackerWeb do
 
   def controller do
     quote do
-      use Phoenix.Controller, namespace: HabitTrackerWeb
+      use Phoenix.Controller,
+        formats: [:html, :json],
+        layouts: [html: HabitTrackerWeb.Layouts]
+
       import Plug.Conn
       import HabitTrackerWeb.Gettext
-      alias HabitTrackerWeb.Router.Helpers, as: Routes
+
+      use Phoenix.VerifiedRoutes,
+        endpoint: HabitTrackerWeb.Endpoint,
+        router: HabitTrackerWeb.Router,
+        statics: HabitTrackerWeb.static_paths()
     end
   end
 
@@ -58,11 +65,16 @@ defmodule HabitTrackerWeb do
       import Phoenix.Controller,
         only: [get_csrf_token: 0, view_module: 1, view_template: 1]
 
-      import Phoenix.VerifiedRoutes
+      use Phoenix.VerifiedRoutes,
+        endpoint: HabitTrackerWeb.Endpoint,
+        router: HabitTrackerWeb.Router,
+        statics: HabitTrackerWeb.static_paths()
 
       unquote(view_helpers())
     end
   end
+
+  def static_paths, do: ~w(assets fonts images favicon.ico robots.txt)
 
   defp view_helpers do
     quote do
