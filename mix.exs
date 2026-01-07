@@ -106,11 +106,15 @@ defmodule GoodJob.MixProject do
       extras: [
         "README.md",
         "CHANGELOG.md",
+        "COMPATIBILITY.md",
         "CONTRIBUTING.md",
         "GOVERNANCE.md",
+        "LICENSE.md",
+        "examples/README.md",
+        "MIGRATION_FROM_RUBY.md",
         "SECURITY.md",
         "PUBLISHING.md",
-        "MIGRATION_FROM_RUBY.md"
+        "STANDALONE.md"
       ],
       groups_for_modules: [
         Core: [

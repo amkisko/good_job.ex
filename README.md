@@ -328,10 +328,10 @@ end
 
 ## Examples
 
-Complete working examples are available in the [`examples/`](examples/) directory:
+Complete working examples are available in the [`examples/`](https://github.com/amkisko/good_job.ex/tree/main/examples) directory:
 
-- **[habit_tracker](examples/habit_tracker/)** - A full Phoenix application demonstrating GoodJob integration with LiveView dashboard, cron jobs, and batch operations
-- **[monorepo_example](examples/monorepo_example/)** - A monorepo setup showing Ruby and Elixir applications sharing the same GoodJob database
+- **[habit_tracker](https://github.com/amkisko/good_job.ex/tree/main/examples/habit_tracker)** - A full Phoenix application demonstrating GoodJob integration with LiveView dashboard, cron jobs, and batch operations
+- **[monorepo_example](https://github.com/amkisko/good_job.ex/tree/main/examples/monorepo_example)** - A monorepo setup showing Ruby and Elixir applications sharing the same GoodJob database
 
 See [examples/README.md](examples/README.md) for more details.
 
