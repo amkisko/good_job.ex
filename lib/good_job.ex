@@ -124,20 +124,8 @@ defmodule GoodJob do
                 # Execute after_enqueue callback
                 after_enqueue(callback_module, job, opts)
 
-                # Execute based on mode
-                case execution_mode do
-                  :inline ->
-                    GoodJob.ExecutionMode.execute(job, :inline, opts)
-
-                  :async ->
-                    {:ok, job}
-
-                  :external ->
-                    GoodJob.ExecutionMode.execute(job, :external, opts)
-
-                  _ ->
-                    {:ok, job}
-                end
+                # Execute based on mode (default async just enqueues).
+                GoodJob.ExecutionMode.execute(job, execution_mode, opts)
 
               error ->
                 error
@@ -204,6 +192,7 @@ defmodule GoodJob do
 
   defp after_enqueue(nil, _job, _opts), do: :ok
   defp after_enqueue(job_module, job, opts), do: GoodJob.JobCallbacks.after_enqueue(job_module, job, opts)
+
 
   @doc """
   Shuts down all GoodJob processes gracefully.

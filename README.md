@@ -251,8 +251,7 @@ queues: "-queue1,queue2:2"
 ## Execution Modes
 
 - **`:inline`** - Execute immediately in current process (test/dev only)
-- **`:async`** / **`:async_server`** - Execute in processes within web server process only
-- **`:async_all`** - Execute in processes in any process
+- **`:async`** - Execute in processes within web server process only
 - **`:external`** - Enqueue only, requires separate worker process (production default)
 
 ## Configuration

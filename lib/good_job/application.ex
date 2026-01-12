@@ -5,13 +5,12 @@ defmodule GoodJob.Application do
   This module starts the GoodJob supervision tree.
 
   The application will only start GoodJob.Supervisor automatically when
-  `execution_mode` is set to `:async`, `:async_server`, or `:async_all`.
+  `execution_mode` is set to `:async`.
   When `execution_mode` is `:external`, GoodJob must be started manually
   (e.g., via a separate process or CLI command).
 
   Behavior:
-  - `:async` / `:async_server` mode: GoodJob starts automatically in the web server process only
-  - `:async_all` mode: GoodJob starts automatically in any process
+  - `:async` mode: GoodJob starts automatically in the web server process only
   - `:external` mode: GoodJob runs in a separate process (via `good_job start` command)
   - `:inline` mode: GoodJob does not start automatically (used for testing)
   """

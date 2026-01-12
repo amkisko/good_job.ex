@@ -4,9 +4,7 @@ defmodule GoodJob.Config.Validation do
   """
 
   # Valid execution modes (aligned with Ruby GoodJob)
-  # :async and :async_server are equivalent (async_server is alias for async)
-  # :async_all executes in any process (not just web server)
-  @valid_execution_modes [:external, :async, :async_all, :async_server, :inline]
+  @valid_execution_modes [:external, :async, :inline]
 
   @doc """
   Validates configuration and raises if invalid.

@@ -10,10 +10,9 @@ defmodule GoodJob.Config do
   ## Configuration Options
 
     * `:repo` - Ecto repository module (required)
-    * `:execution_mode` - Execution mode (`:external`, `:async`, `:async_all`, `:async_server`, `:inline`)
+    * `:execution_mode` - Execution mode (`:external`, `:async`, `:inline`)
       - `:inline` - Execute immediately in current process (test/dev only)
-      - `:async` / `:async_server` - Execute in processes within web server process only
-      - `:async_all` - Execute in processes in any process
+      - `:async` - Execute in processes within web server process only
       - `:external` - Enqueue only, requires separate worker process (production default)
     * `:queues` - Queue configuration string (default: `"*"`)
     * `:max_processes` - Maximum concurrent processes per scheduler (default: `5`)
@@ -53,7 +52,7 @@ defmodule GoodJob.Config do
 
   @type t :: %{
           repo: module(),
-          execution_mode: :external | :async | :async_all | :async_server | :inline,
+          execution_mode: :external | :async | :inline,
           queues: String.t(),
           max_processes: pos_integer(),
           poll_interval: integer(),
@@ -140,22 +139,13 @@ defmodule GoodJob.Config do
   @doc """
   Returns the execution mode.
 
-  Valid modes (aligned with Ruby GoodJob):
+  Valid modes:
   - `:inline` - Execute immediately in current process (test/dev only)
-  - `:async` / `:async_server` - Execute in processes within web server process only
-  - `:async_all` - Execute in processes in any process
+  - `:async` - Execute in processes within web server process only
   - `:external` - Enqueue only, requires separate worker process (production default)
-
-  `:async_server` is an alias for `:async`.
   """
   def execution_mode do
-    mode = get(:execution_mode, Defaults.get(:execution_mode))
-
-    # Normalize async_server to async (they're equivalent)
-    case mode do
-      :async_server -> :async
-      other -> other
-    end
+    get(:execution_mode, Defaults.get(:execution_mode))
   end
 
   @doc """
@@ -313,16 +303,14 @@ defmodule GoodJob.Config do
   Returns whether GoodJob should start automatically based on execution_mode.
 
   GoodJob starts automatically when:
-  - execution_mode is `:async` or `:async_server` (starts in web server process only)
-  - execution_mode is `:async_all` (starts in any process)
+  - execution_mode is `:async` (starts in web server process only)
   - execution_mode is `:external` AND NOT running in web server process.
 
   When execution_mode is `:external` and running in web server process, GoodJob should not start
   (e.g., when running Phoenix web server separately from worker).
 
   Behavior:
-  - `:async` / `:async_server` mode: GoodJob starts automatically in the web server process only
-  - `:async_all` mode: GoodJob starts automatically in any process
+  - `:async` mode: GoodJob starts automatically in the web server process only
   - `:external` mode: GoodJob runs in a separate process (via `good_job start` command)
   - `:inline` mode: GoodJob does not start automatically (used for testing)
   """
@@ -331,10 +319,6 @@ defmodule GoodJob.Config do
       :async ->
         # Only start in web server process
         in_webserver?()
-
-      :async_all ->
-        # Start in any process
-        true
 
       :external ->
         # In external mode, only start if NOT in web server process
@@ -499,7 +483,7 @@ defmodule GoodJob.Config do
     base_interval = get(:poll_interval, Defaults.get(:poll_interval))
     env_is_dev = @compile_env == :dev
     mode = execution_mode()
-    is_async_mode = mode in [:async, :async_all, :async_server]
+    is_async_mode = mode == :async
 
     if env_is_dev && is_async_mode do
       -1
