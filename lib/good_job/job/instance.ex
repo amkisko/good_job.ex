@@ -30,6 +30,7 @@ defmodule GoodJob.Job.Instance do
       job = MyJob.new(%{data: "hello"})
       job.perform()
   """
+  @spec perform(t()) :: term()
   def perform(%__MODULE__{job_module: job_module, args: args, options: _options}) do
     if function_exported?(job_module, :perform, 1) do
       normalized_args = normalize_args(args)

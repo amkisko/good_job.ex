@@ -125,16 +125,18 @@ defmodule GoodJob.AdvisoryLock do
     repo = GoodJob.Repo.repo()
     hash_algorithm = hash_algorithm(opts)
 
-    with {:ok, normalized_hash_algorithm} <- normalize_hash_algorithm(hash_algorithm) do
-      lock_key_sql = lock_key_expression_sql(normalized_hash_algorithm)
-      sql = "SELECT #{lock_key_sql}"
+    case normalize_hash_algorithm(hash_algorithm) do
+      {:ok, normalized_hash_algorithm} ->
+        lock_key_sql = lock_key_expression_sql(normalized_hash_algorithm)
+        sql = "SELECT #{lock_key_sql}"
 
-      case repo.query(sql, [key]) do
-        {:ok, %{rows: [[hash]]}} -> hash
-        {:error, _} = error -> error
-      end
-    else
-      {:error, _} = error -> error
+        case repo.query(sql, [key]) do
+          {:ok, %{rows: [[hash]]}} -> hash
+          {:error, _} = error -> error
+        end
+
+      {:error, _} = error ->
+        error
     end
   end
 

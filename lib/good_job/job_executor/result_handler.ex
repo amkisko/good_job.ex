@@ -5,7 +5,6 @@ defmodule GoodJob.JobExecutor.ResultHandler do
 
   require Logger
   import Ecto.Query
-  alias Ecto.Multi
   alias GoodJob.{Execution, Job, Repo, Utils}
 
   defmodule ExecutionContext do
@@ -217,10 +216,15 @@ defmodule GoodJob.JobExecutor.ResultHandler do
     fresh_job = repo.get!(Job, job.id)
     executions_count = (fresh_job.executions_count || 0) + 1
 
-    Multi.new()
-    |> Multi.update(:job, update_job_success(fresh_job, now, executions_count))
-    |> Multi.insert(:execution, create_execution(fresh_job, nil, now, duration, process_id))
-    |> repo.transaction()
+    repo.transaction(fn ->
+      with {:ok, _updated_job} <- repo.update(update_job_success(fresh_job, now, executions_count)),
+           {:ok, _execution} <- repo.insert(create_execution(fresh_job, nil, now, duration, process_id)) do
+        :ok
+      else
+        {:error, changeset} ->
+          repo.rollback(changeset)
+      end
+    end)
     |> case do
       {:ok, _} ->
         GoodJob.PubSub.broadcast(:job_completed, fresh_job.id)
@@ -278,55 +282,55 @@ defmodule GoodJob.JobExecutor.ResultHandler do
         changeset
       end
 
-    # Build Multi
-    multi = Multi.new()
+    result =
+      repo.transaction(fn ->
+        update_result =
+          if is_nil(finished_at) do
+            updated_serialized_params =
+              if is_map(fresh_job.serialized_params) do
+                GoodJob.Protocol.Serialization.update_executions(fresh_job.serialized_params, executions_count)
+              else
+                fresh_job.serialized_params
+              end
 
-    # For retries, use Multi.run with update_all (changeset approach doesn't work reliably for nil)
-    # For exhausted jobs, use the changeset
-    multi =
-      if is_nil(finished_at) do
-        # Use update_all to ensure finished_at is cleared (changeset doesn't work reliably)
-        import Ecto.Query
+            {count, _} =
+              repo.update_all(
+                from(j in Job, where: j.id == ^fresh_job.id),
+                set: [
+                  finished_at: nil,
+                  performed_at: nil,
+                  scheduled_at: scheduled_at,
+                  error: format_error(reason),
+                  executions_count: executions_count,
+                  serialized_params: updated_serialized_params,
+                  locked_by_id: nil,
+                  locked_at: nil
+                ]
+              )
 
-        updated_serialized_params =
-          if is_map(fresh_job.serialized_params) do
-            GoodJob.Protocol.Serialization.update_executions(fresh_job.serialized_params, executions_count)
+            if count == 1 do
+              :ok
+            else
+              {:error, Ecto.Changeset.add_error(Ecto.Changeset.change(fresh_job), :id, "job not updated")}
+            end
           else
-            fresh_job.serialized_params
+            changeset = %{changeset | action: :update}
+
+            case repo.update(changeset) do
+              {:ok, _updated_job} -> :ok
+              {:error, failed_changeset} -> {:error, failed_changeset}
+            end
           end
 
-        Multi.run(multi, :update_job, fn repo_fn, _changes ->
-          {count, _} =
-            repo_fn.update_all(
-              from(j in Job, where: j.id == ^fresh_job.id),
-              set: [
-                finished_at: nil,
-                performed_at: nil,
-                scheduled_at: scheduled_at,
-                error: format_error(reason),
-                executions_count: executions_count,
-                serialized_params: updated_serialized_params,
-                locked_by_id: nil,
-                locked_at: nil
-              ]
-            )
-
-          {:ok, count}
-        end)
-      else
-        # For exhausted jobs, use the changeset
-        changeset = %{changeset | action: :update}
-        Multi.update(multi, :job, changeset)
-      end
-
-    multi =
-      Multi.insert(
-        multi,
-        :execution,
-        create_execution(fresh_job, reason, finished_at, duration, process_id, stacktrace)
-      )
-
-    result = repo.transaction(multi)
+        with :ok <- update_result,
+             {:ok, _execution} <-
+               repo.insert(create_execution(fresh_job, reason, finished_at, duration, process_id, stacktrace)) do
+          :ok
+        else
+          {:error, failed_changeset} ->
+            repo.rollback(failed_changeset)
+        end
+      end)
 
     result
     |> case do
@@ -372,10 +376,15 @@ defmodule GoodJob.JobExecutor.ResultHandler do
     repo = Repo.repo()
     fresh_job = repo.get!(Job, job.id)
 
-    Multi.new()
-    |> Multi.update(:job, update_job_cancel(fresh_job, reason, now))
-    |> Multi.insert(:execution, create_execution(fresh_job, reason, now, duration, process_id))
-    |> repo.transaction()
+    repo.transaction(fn ->
+      with {:ok, _updated_job} <- repo.update(update_job_cancel(fresh_job, reason, now)),
+           {:ok, _execution} <- repo.insert(create_execution(fresh_job, reason, now, duration, process_id)) do
+        :ok
+      else
+        {:error, changeset} ->
+          repo.rollback(changeset)
+      end
+    end)
     |> case do
       {:ok, _} ->
         GoodJob.PubSub.broadcast(:job_cancelled, fresh_job.id)
@@ -398,10 +407,15 @@ defmodule GoodJob.JobExecutor.ResultHandler do
     repo = Repo.repo()
     fresh_job = repo.get!(Job, job.id)
 
-    Multi.new()
-    |> Multi.update(:job, update_job_discard(fresh_job, reason, now))
-    |> Multi.insert(:execution, create_execution(fresh_job, reason, now, duration, process_id))
-    |> repo.transaction()
+    repo.transaction(fn ->
+      with {:ok, _updated_job} <- repo.update(update_job_discard(fresh_job, reason, now)),
+           {:ok, _execution} <- repo.insert(create_execution(fresh_job, reason, now, duration, process_id)) do
+        :ok
+      else
+        {:error, changeset} ->
+          repo.rollback(changeset)
+      end
+    end)
     |> case do
       {:ok, _} ->
         GoodJob.PubSub.broadcast(:job_discarded, fresh_job.id)
@@ -425,10 +439,15 @@ defmodule GoodJob.JobExecutor.ResultHandler do
     repo = Repo.repo()
     fresh_job = repo.get!(Job, job.id)
 
-    Multi.new()
-    |> Multi.update(:job, update_job_snooze(fresh_job, scheduled_at))
-    |> Multi.insert(:execution, create_execution(fresh_job, nil, nil, duration, process_id))
-    |> repo.transaction()
+    repo.transaction(fn ->
+      with {:ok, _updated_job} <- repo.update(update_job_snooze(fresh_job, scheduled_at)),
+           {:ok, _execution} <- repo.insert(create_execution(fresh_job, nil, nil, duration, process_id)) do
+        :ok
+      else
+        {:error, changeset} ->
+          repo.rollback(changeset)
+      end
+    end)
     |> case do
       {:ok, _} ->
         GoodJob.PubSub.broadcast(:job_snoozed, fresh_job.id)

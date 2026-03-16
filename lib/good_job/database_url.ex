@@ -180,8 +180,6 @@ defmodule GoodJob.DatabaseURL do
   defp parse_adapter(_scheme), do: Ecto.Adapters.Postgres
 
   defp default_port(Ecto.Adapters.Postgres), do: 5432
-  # All adapters default to 5432 for now
-  defp default_port(_adapter), do: 5432
 
   defp parse_query(nil), do: []
   defp parse_query(""), do: []

@@ -42,7 +42,7 @@ defmodule GoodJob.JobCallbacks do
   @doc """
   Executes before_perform callback if defined.
   """
-  @spec before_perform(module(), map(), GoodJob.Job.t()) :: {:ok, map()} | {:error, term()}
+  @spec before_perform(module(), term(), GoodJob.Job.t() | nil) :: {:ok, term()} | {:error, term()}
   def before_perform(job_module, args, job) do
     if function_exported?(job_module, :before_perform, 2) do
       case job_module.before_perform(args, job) do
@@ -59,7 +59,7 @@ defmodule GoodJob.JobCallbacks do
   @doc """
   Executes after_perform callback if defined.
   """
-  @spec after_perform(module(), map(), GoodJob.Job.t(), term()) :: :ok
+  @spec after_perform(module(), term(), GoodJob.Job.t() | nil, term()) :: :ok
   def after_perform(job_module, args, job, result) do
     if function_exported?(job_module, :after_perform, 3) do
       job_module.after_perform(args, job, result)
@@ -71,7 +71,7 @@ defmodule GoodJob.JobCallbacks do
   @doc """
   Executes on_error callback if defined.
   """
-  @spec on_error(module(), map(), GoodJob.Job.t(), Exception.t()) :: :ok
+  @spec on_error(module(), term(), GoodJob.Job.t() | nil, Exception.t()) :: :ok
   def on_error(job_module, args, job, error) do
     if function_exported?(job_module, :on_error, 3) do
       job_module.on_error(args, job, error)

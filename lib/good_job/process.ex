@@ -140,56 +140,71 @@ defmodule GoodJob.Process do
   end
 
   defp advisory_lock_join_dynamic("md5") do
-    dynamic([p, l], fragment(
-      "? = substring((('x' || substr(md5(?::text), 1, 16))::bit(64)::bigint)::bit(64) from 1 for 32)::bit(32)::int AND ? = substring((('x' || substr(md5(?::text), 1, 16))::bit(64)::bigint)::bit(64) from 33 for 32)::bit(32)::int",
-      l.classid,
-      p.id,
-      l.objid,
-      p.id
-    ))
+    dynamic(
+      [p, l],
+      fragment(
+        "? = substring((('x' || substr(md5(?::text), 1, 16))::bit(64)::bigint)::bit(64) from 1 for 32)::bit(32)::int AND ? = substring((('x' || substr(md5(?::text), 1, 16))::bit(64)::bigint)::bit(64) from 33 for 32)::bit(32)::int",
+        l.classid,
+        p.id,
+        l.objid,
+        p.id
+      )
+    )
   end
 
   defp advisory_lock_join_dynamic("hashtextextended") do
-    dynamic([p, l], fragment(
-      "? = substring((hashtextextended(?::text, 0))::bit(64) from 1 for 32)::bit(32)::int AND ? = substring((hashtextextended(?::text, 0))::bit(64) from 33 for 32)::bit(32)::int",
-      l.classid,
-      p.id,
-      l.objid,
-      p.id
-    ))
+    dynamic(
+      [p, l],
+      fragment(
+        "? = substring((hashtextextended(?::text, 0))::bit(64) from 1 for 32)::bit(32)::int AND ? = substring((hashtextextended(?::text, 0))::bit(64) from 33 for 32)::bit(32)::int",
+        l.classid,
+        p.id,
+        l.objid,
+        p.id
+      )
+    )
   end
 
   defp advisory_lock_join_dynamic("hashtext") do
-    dynamic([p, l], fragment(
-      "? = substring((((hashtext(?::text)::bigint << 32) + (hashtext(('good_job-' || ?::text))::bigint & 4294967295::bigint)))::bit(64) from 1 for 32)::bit(32)::int AND ? = substring((((hashtext(?::text)::bigint << 32) + (hashtext(('good_job-' || ?::text))::bigint & 4294967295::bigint)))::bit(64) from 33 for 32)::bit(32)::int",
-      l.classid,
-      p.id,
-      p.id,
-      l.objid,
-      p.id,
-      p.id
-    ))
+    dynamic(
+      [p, l],
+      fragment(
+        "? = substring((((hashtext(?::text)::bigint << 32) + (hashtext(('good_job-' || ?::text))::bigint & 4294967295::bigint)))::bit(64) from 1 for 32)::bit(32)::int AND ? = substring((((hashtext(?::text)::bigint << 32) + (hashtext(('good_job-' || ?::text))::bigint & 4294967295::bigint)))::bit(64) from 33 for 32)::bit(32)::int",
+        l.classid,
+        p.id,
+        p.id,
+        l.objid,
+        p.id,
+        p.id
+      )
+    )
   end
 
   defp advisory_lock_join_dynamic("uuid_v5") do
-    dynamic([p, l], fragment(
-      "? = substring((('x' || substr(replace(uuid_generate_v5('6ba7b810-9dad-11d1-80b4-00c04fd430c8'::uuid, ?::text)::text, '-', ''), 1, 16))::bit(64)::bigint)::bit(64) from 1 for 32)::bit(32)::int AND ? = substring((('x' || substr(replace(uuid_generate_v5('6ba7b810-9dad-11d1-80b4-00c04fd430c8'::uuid, ?::text)::text, '-', ''), 1, 16))::bit(64)::bigint)::bit(64) from 33 for 32)::bit(32)::int",
-      l.classid,
-      p.id,
-      l.objid,
-      p.id
-    ))
+    dynamic(
+      [p, l],
+      fragment(
+        "? = substring((('x' || substr(replace(uuid_generate_v5('6ba7b810-9dad-11d1-80b4-00c04fd430c8'::uuid, ?::text)::text, '-', ''), 1, 16))::bit(64)::bigint)::bit(64) from 1 for 32)::bit(32)::int AND ? = substring((('x' || substr(replace(uuid_generate_v5('6ba7b810-9dad-11d1-80b4-00c04fd430c8'::uuid, ?::text)::text, '-', ''), 1, 16))::bit(64)::bigint)::bit(64) from 33 for 32)::bit(32)::int",
+        l.classid,
+        p.id,
+        l.objid,
+        p.id
+      )
+    )
   end
 
   defp advisory_lock_join_dynamic(hash_algorithm) do
-    dynamic([p, l], fragment(
-      "? = substring((('x' || substr(encode(digest(?::text, ?), 'hex'), 1, 16))::bit(64)::bigint)::bit(64) from 1 for 32)::bit(32)::int AND ? = substring((('x' || substr(encode(digest(?::text, ?), 'hex'), 1, 16))::bit(64)::bigint)::bit(64) from 33 for 32)::bit(32)::int",
-      l.classid,
-      p.id,
-      ^hash_algorithm,
-      l.objid,
-      p.id,
-      ^hash_algorithm
-    ))
+    dynamic(
+      [p, l],
+      fragment(
+        "? = substring((('x' || substr(encode(digest(?::text, ?), 'hex'), 1, 16))::bit(64)::bigint)::bit(64) from 1 for 32)::bit(32)::int AND ? = substring((('x' || substr(encode(digest(?::text, ?), 'hex'), 1, 16))::bit(64)::bigint)::bit(64) from 33 for 32)::bit(32)::int",
+        l.classid,
+        p.id,
+        ^hash_algorithm,
+        l.objid,
+        p.id,
+        ^hash_algorithm
+      )
+    )
   end
 end

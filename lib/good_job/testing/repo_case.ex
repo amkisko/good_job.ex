@@ -22,8 +22,8 @@ defmodule GoodJob.Testing.RepoCase do
   setup tags do
     repo = GoodJob.Config.repo()
 
-    pid = start_owner_with_retry!(repo, shared: not tags[:async])
-    ExUnit.Callbacks.on_exit(fn -> Sandbox.stop_owner(pid) end)
+    owner_pid = start_owner_with_retry!(repo, shared: not tags[:async])
+    ExUnit.Callbacks.on_exit(make_ref(), fn -> Sandbox.stop_owner(owner_pid) end)
     :ok
   end
 

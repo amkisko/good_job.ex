@@ -13,6 +13,7 @@ lib/good_job/repo_case.ex:44
 lib/good_job/testing/job_case.ex:10
 lib/good_job/testing/repo_case.ex:1
 lib/good_job/testing/repo_case.ex:12
+lib/good_job/testing/repo_case.ex:26
 lib/good_job/testing/repo_case.ex:46
 
 # GoodJob.Testing - test helpers that use ExUnit macros
@@ -144,4 +145,3 @@ lib/good_job/concurrency.ex:86
 
 # Executor - pattern_match_cov warnings (intentional exhaustive matches)
 lib/good_job/executor.ex:192
-
