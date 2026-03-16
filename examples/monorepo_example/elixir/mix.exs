@@ -28,7 +28,7 @@ defmodule MonorepoExample.MixProject do
       # Use local good_job dependency
       {:good_job, path: good_job_path},
       {:ecto_sql, "~> 3.13"},
-      {:postgrex, "~> 0.21"},
+      {:postgrex, "~> 0.22"},
       {:jason, "~> 1.4"},
       # Phoenix dependencies for web interface
       {:phoenix, "~> 1.8"},
@@ -36,7 +36,7 @@ defmodule MonorepoExample.MixProject do
       {:phoenix_html, "~> 4.3"},
       {:phoenix_live_reload, "~> 1.2", only: :dev},
       {:phoenix_live_dashboard, "~> 0.8"},
-      {:plug_cowboy, "~> 2.7"},
+      {:plug_cowboy, "~> 2.8"},
       # Phlex and StyleCapsule for component-based UI
       {:phlex, "~> 0.2"},
       {:style_capsule, "~> 0.8"},

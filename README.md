@@ -17,7 +17,7 @@ Concurrent, Postgres-based job queue backend for Elixir. Provides attribute-base
 
 ## Features
 
-- **PostgreSQL Backend** - Relies upon Postgres integrity, session-level Advisory Locks to provide run-once safety
+- **PostgreSQL Backend** - Relies upon Postgres integrity with advisory locks (transaction-level for job claims, session-level for process heartbeat) to provide run-once safety
 - **LISTEN/NOTIFY** - Uses PostgreSQL LISTEN/NOTIFY to reduce queuing latency
 - **Multiple Execution Modes** - Inline (testing), async (development), external (production)
 - **Queue Management** - Support for ordered queues, queue-specific concurrency, and semicolon-separated pools
@@ -47,7 +47,7 @@ end
 For Phoenix LiveView dashboard support, also ensure you have:
 
 ```elixir
-{:phoenix_live_view, "~> 0.20"}
+{:phoenix_live_view, "~> 1.1"}
 ```
 
 ## Quick Start
@@ -227,6 +227,32 @@ defmodule MyApp.ThrottledJob do
 end
 ```
 
+### Bulk Enqueue
+
+You can buffer and insert multiple jobs atomically with `GoodJob.Bulk`:
+
+```elixir
+{:ok, jobs} =
+  GoodJob.Bulk.enqueue(fn ->
+    MyApp.EmailJob.perform_later(%{user_id: 1})
+    MyApp.EmailJob.perform_later(%{user_id: 2})
+  end)
+
+length(jobs)
+#=> 2
+```
+
+You can also enqueue job instances directly:
+
+```elixir
+jobs = [
+  MyApp.EmailJob.new(%{user_id: 1}),
+  MyApp.EmailJob.new(%{user_id: 2}, queue: "mailers")
+]
+
+{:ok, _inserted} = GoodJob.Bulk.enqueue(jobs)
+```
+
 ## Queue Configuration
 
 ```elixir
@@ -267,10 +293,31 @@ config :good_job,
   enable_listen_notify: true,
   enable_cron: false,
   cleanup_discarded_jobs: true,
-  cleanup_preserved_jobs_before_seconds_ago: 1_209_600  # 14 days
+  cleanup_preserved_jobs_before_seconds_ago: 1_209_600, # 14 days
+  cleanup_preserved_jobs_max_count: 1_000,
+  advisory_lock_function: :pg_try_advisory_xact_lock,
+  advisory_lock_hash_algorithm: :md5
 ```
 
 See [config/prod.exs.example](config/prod.exs.example) for a complete configuration example with all available options.
+
+### Advisory Lock Configuration
+
+- `:advisory_lock_function` controls advisory lock acquisition for transactional lock paths (job claims and concurrency checks). Default: `:pg_try_advisory_xact_lock`.
+- `:advisory_lock_hash_algorithm` controls lock-key derivation strategy. Default: `:md5`. Supported: `:md5`, `:sha1`, `:sha224`, `:sha256`, `:sha384`, `:sha512`, `:hashtextextended`, `:hashtext`, `:uuid_v5`.
+- Session-level locks for process heartbeat use `pg_try_advisory_lock`.
+
+Environment variables:
+
+- `GOOD_JOB_ADVISORY_LOCK_FUNCTION`
+- `GOOD_JOB_ADVISORY_LOCK_HASH_ALGORITHM`
+
+Notes:
+
+- `hashtextextended` requires PostgreSQL 11+.
+- `hashtext` is available in all supported PostgreSQL versions (and documented at least since PostgreSQL 9.6).
+- `sha*` strategies require PostgreSQL `pgcrypto` (`digest()`).
+- `uuid_v5` requires PostgreSQL `uuid-ossp` (`uuid_generate_v5()`).
 
 ## Web Dashboard
 
@@ -317,11 +364,11 @@ end
 
 ## Requirements
 
-- Elixir >= 1.18
+- Elixir >= 1.19
 - PostgreSQL >= 12
 - Ecto >= 3.0
 - Phoenix >= 1.7 (optional, for Phoenix integration)
-- Phoenix LiveView >= 0.20 (optional, for LiveView dashboard)
+- Phoenix LiveView >= 1.1 (optional, for LiveView dashboard)
 
 **Note**: GoodJob can be used without Phoenix! See [STANDALONE.md](STANDALONE.md).
 

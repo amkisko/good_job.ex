@@ -76,14 +76,16 @@ defmodule GoodJob.DatabaseURL do
     adapter = parse_adapter(uri.scheme)
 
     # Build config keyword list
-    config = [
-      username: username,
-      password: password,
-      hostname: uri.host || "localhost",
-      port: uri.port || default_port(adapter),
-      database: database,
-      adapter: adapter
-    ]
+    config =
+      [
+        username: username,
+        password: password,
+        hostname: uri.host,
+        port: uri.port || default_port(adapter),
+        database: database,
+        adapter: adapter
+      ]
+      |> Enum.reject(fn {_key, value} -> is_nil(value) end)
 
     # Add query parameters as additional options
     query_params = parse_query(uri.query)

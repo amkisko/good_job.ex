@@ -67,11 +67,15 @@ defmodule GoodJob.Process do
              end
 
            # Acquire advisory lock on the process ID
-           lock_key = AdvisoryLock.hash_key(id)
+           case AdvisoryLock.hash_key(id) do
+             lock_key when is_integer(lock_key) ->
+               case AdvisoryLock.lock_session(lock_key) do
+                 true -> record
+                 false -> raise "Failed to acquire advisory lock for process #{id}"
+               end
 
-           case AdvisoryLock.lock(lock_key) do
-             true -> record
-             false -> raise "Failed to acquire advisory lock for process #{id}"
+             {:error, reason} ->
+               raise "Failed to hash advisory lock key for process #{id}: #{inspect(reason)}"
            end
          end) do
       {:ok, record} -> {:ok, record}
@@ -88,12 +92,14 @@ defmodule GoodJob.Process do
   """
   def active do
     expired_cutoff = DateTime.add(DateTime.utc_now(), -@expired_interval_minutes * 60, :second)
+    hash_algorithm = advisory_lock_hash_algorithm()
+    join_condition = advisory_lock_join_dynamic(hash_algorithm)
 
     from(p in __MODULE__,
       left_join: l in subquery(advisory_locks_query()),
-      on: fragment("hashtext(?::text) = ?", p.id, l.objid),
+      on: ^join_condition,
       where:
-        (p.lock_type == 1 and not is_nil(l.objid)) or
+        (p.lock_type == 1 and not is_nil(l.classid)) or
           (p.lock_type != 1 and p.updated_at > ^expired_cutoff)
     )
   end
@@ -107,21 +113,83 @@ defmodule GoodJob.Process do
   """
   def inactive do
     expired_cutoff = DateTime.add(DateTime.utc_now(), -@expired_interval_minutes * 60, :second)
+    hash_algorithm = advisory_lock_hash_algorithm()
+    join_condition = advisory_lock_join_dynamic(hash_algorithm)
 
     from(p in __MODULE__,
       left_join: l in subquery(advisory_locks_query()),
-      on: fragment("hashtext(?::text) = ?", p.id, l.objid),
+      on: ^join_condition,
       where:
-        (p.lock_type == 1 and is_nil(l.objid)) or
+        (p.lock_type == 1 and is_nil(l.classid)) or
           (p.lock_type != 1 and p.updated_at <= ^expired_cutoff)
     )
   end
 
   defp advisory_locks_query do
     from(l in fragment("pg_locks"),
-      where: fragment("locktype = 'advisory' AND objsubid IN (1, 2)"),
-      select: %{objid: fragment("objid")},
+      where: fragment("locktype = 'advisory' AND objsubid = 1"),
+      select: %{classid: fragment("classid"), objid: fragment("objid")},
       distinct: true
     )
+  end
+
+  defp advisory_lock_hash_algorithm do
+    GoodJob.Config.advisory_lock_hash_algorithm()
+    |> to_string()
+    |> String.downcase()
+  end
+
+  defp advisory_lock_join_dynamic("md5") do
+    dynamic([p, l], fragment(
+      "? = substring((('x' || substr(md5(?::text), 1, 16))::bit(64)::bigint)::bit(64) from 1 for 32)::bit(32)::int AND ? = substring((('x' || substr(md5(?::text), 1, 16))::bit(64)::bigint)::bit(64) from 33 for 32)::bit(32)::int",
+      l.classid,
+      p.id,
+      l.objid,
+      p.id
+    ))
+  end
+
+  defp advisory_lock_join_dynamic("hashtextextended") do
+    dynamic([p, l], fragment(
+      "? = substring((hashtextextended(?::text, 0))::bit(64) from 1 for 32)::bit(32)::int AND ? = substring((hashtextextended(?::text, 0))::bit(64) from 33 for 32)::bit(32)::int",
+      l.classid,
+      p.id,
+      l.objid,
+      p.id
+    ))
+  end
+
+  defp advisory_lock_join_dynamic("hashtext") do
+    dynamic([p, l], fragment(
+      "? = substring((((hashtext(?::text)::bigint << 32) + (hashtext(('good_job-' || ?::text))::bigint & 4294967295::bigint)))::bit(64) from 1 for 32)::bit(32)::int AND ? = substring((((hashtext(?::text)::bigint << 32) + (hashtext(('good_job-' || ?::text))::bigint & 4294967295::bigint)))::bit(64) from 33 for 32)::bit(32)::int",
+      l.classid,
+      p.id,
+      p.id,
+      l.objid,
+      p.id,
+      p.id
+    ))
+  end
+
+  defp advisory_lock_join_dynamic("uuid_v5") do
+    dynamic([p, l], fragment(
+      "? = substring((('x' || substr(replace(uuid_generate_v5('6ba7b810-9dad-11d1-80b4-00c04fd430c8'::uuid, ?::text)::text, '-', ''), 1, 16))::bit(64)::bigint)::bit(64) from 1 for 32)::bit(32)::int AND ? = substring((('x' || substr(replace(uuid_generate_v5('6ba7b810-9dad-11d1-80b4-00c04fd430c8'::uuid, ?::text)::text, '-', ''), 1, 16))::bit(64)::bigint)::bit(64) from 33 for 32)::bit(32)::int",
+      l.classid,
+      p.id,
+      l.objid,
+      p.id
+    ))
+  end
+
+  defp advisory_lock_join_dynamic(hash_algorithm) do
+    dynamic([p, l], fragment(
+      "? = substring((('x' || substr(encode(digest(?::text, ?), 'hex'), 1, 16))::bit(64)::bigint)::bit(64) from 1 for 32)::bit(32)::int AND ? = substring((('x' || substr(encode(digest(?::text, ?), 'hex'), 1, 16))::bit(64)::bigint)::bit(64) from 33 for 32)::bit(32)::int",
+      l.classid,
+      p.id,
+      ^hash_algorithm,
+      l.objid,
+      p.id,
+      ^hash_algorithm
+    ))
   end
 end

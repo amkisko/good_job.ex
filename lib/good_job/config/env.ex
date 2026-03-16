@@ -13,6 +13,8 @@ defmodule GoodJob.Config.Env do
     |> maybe_put(:max_processes, System.get_env("GOOD_JOB_MAX_PROCESSES"))
     |> maybe_put(:poll_interval, System.get_env("GOOD_JOB_POLL_INTERVAL"))
     |> maybe_put(:max_cache, System.get_env("GOOD_JOB_MAX_CACHE"))
+    |> maybe_put(:cleanup_interval_seconds, System.get_env("GOOD_JOB_CLEANUP_INTERVAL_SECONDS"))
+    |> maybe_put(:cleanup_interval_jobs, System.get_env("GOOD_JOB_CLEANUP_INTERVAL_JOBS"))
     |> maybe_put(:enable_cron, System.get_env("GOOD_JOB_ENABLE_CRON"))
     |> maybe_put(:enable_listen_notify, System.get_env("GOOD_JOB_ENABLE_LISTEN_NOTIFY"))
     |> maybe_put(:database_pool_size, System.get_env("GOOD_JOB_DATABASE_POOL_SIZE"))
@@ -28,8 +30,14 @@ defmodule GoodJob.Config.Env do
       :cleanup_preserved_jobs_before_seconds_ago,
       System.get_env("GOOD_JOB_CLEANUP_PRESERVED_JOBS_BEFORE_SECONDS_AGO")
     )
+    |> maybe_put(
+      :cleanup_preserved_jobs_max_count,
+      System.get_env("GOOD_JOB_CLEANUP_PRESERVED_JOBS_MAX_COUNT")
+    )
     |> maybe_put(:enable_pauses, System.get_env("GOOD_JOB_ENABLE_PAUSES"))
     |> maybe_put(:advisory_lock_heartbeat, System.get_env("GOOD_JOB_ADVISORY_LOCK_HEARTBEAT"))
+    |> maybe_put(:advisory_lock_function, System.get_env("GOOD_JOB_ADVISORY_LOCK_FUNCTION"))
+    |> maybe_put(:advisory_lock_hash_algorithm, System.get_env("GOOD_JOB_ADVISORY_LOCK_HASH_ALGORITHM"))
     |> maybe_put(:cron, parse_cron_env())
   end
 
@@ -60,6 +68,12 @@ defmodule GoodJob.Config.Env do
       :max_cache ->
         Map.put(config, key, String.to_integer(value))
 
+      :cleanup_interval_seconds ->
+        Map.put(config, key, String.to_integer(value))
+
+      :cleanup_interval_jobs ->
+        Map.put(config, key, String.to_integer(value))
+
       :enable_cron ->
         Map.put(config, key, value in ["true", "1", "yes"])
 
@@ -88,6 +102,9 @@ defmodule GoodJob.Config.Env do
         Map.put(config, key, String.to_integer(value))
 
       :cleanup_preserved_jobs_before_seconds_ago ->
+        Map.put(config, key, String.to_integer(value))
+
+      :cleanup_preserved_jobs_max_count ->
         Map.put(config, key, String.to_integer(value))
 
       :cleanup_discarded_jobs ->

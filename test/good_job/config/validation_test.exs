@@ -116,5 +116,39 @@ defmodule GoodJob.Config.ValidationTest do
       assert is_map(result)
       refute Map.has_key?(result, :external_jobs)
     end
+
+    test "validates advisory_lock_function when supported" do
+      config = Map.put(@base_config, :advisory_lock_function, :pg_try_advisory_xact_lock)
+      result = Validation.validate!(config)
+      assert result.advisory_lock_function == :pg_try_advisory_xact_lock
+    end
+
+    test "raises error when advisory_lock_function is unsupported" do
+      config = Map.put(@base_config, :advisory_lock_function, :pg_not_a_real_lock_function)
+
+      assert_raise ArgumentError, ~r/advisory_lock_function must be one of/, fn ->
+        Validation.validate!(config)
+      end
+    end
+
+    test "validates advisory_lock_hash_algorithm when supported" do
+      config = Map.put(@base_config, :advisory_lock_hash_algorithm, :sha256)
+      result = Validation.validate!(config)
+      assert result.advisory_lock_hash_algorithm == :sha256
+    end
+
+    test "validates additional advisory_lock_hash_algorithm strategies" do
+      assert Validation.validate!(Map.put(@base_config, :advisory_lock_hash_algorithm, :hashtextextended))
+      assert Validation.validate!(Map.put(@base_config, :advisory_lock_hash_algorithm, :hashtext))
+      assert Validation.validate!(Map.put(@base_config, :advisory_lock_hash_algorithm, :uuid_v5))
+    end
+
+    test "raises error when advisory_lock_hash_algorithm is unsupported" do
+      config = Map.put(@base_config, :advisory_lock_hash_algorithm, :unsupported_hash)
+
+      assert_raise ArgumentError, ~r/advisory_lock_hash_algorithm must be one of/, fn ->
+        Validation.validate!(config)
+      end
+    end
   end
 end

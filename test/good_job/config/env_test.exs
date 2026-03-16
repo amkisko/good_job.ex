@@ -224,6 +224,27 @@ defmodule GoodJob.Config.EnvTest do
       System.delete_env("GOOD_JOB_CLEANUP_PRESERVED_JOBS_BEFORE_SECONDS_AGO")
     end
 
+    test "merges cleanup interval settings from environment" do
+      System.put_env("GOOD_JOB_CLEANUP_INTERVAL_SECONDS", "120")
+      System.put_env("GOOD_JOB_CLEANUP_INTERVAL_JOBS", "250")
+
+      config = Env.merge_env_vars(%{})
+      assert config.cleanup_interval_seconds == 120
+      assert config.cleanup_interval_jobs == 250
+
+      System.delete_env("GOOD_JOB_CLEANUP_INTERVAL_SECONDS")
+      System.delete_env("GOOD_JOB_CLEANUP_INTERVAL_JOBS")
+    end
+
+    test "merges cleanup_preserved_jobs_max_count from environment" do
+      System.put_env("GOOD_JOB_CLEANUP_PRESERVED_JOBS_MAX_COUNT", "1000")
+
+      config = Env.merge_env_vars(%{})
+      assert config.cleanup_preserved_jobs_max_count == 1000
+
+      System.delete_env("GOOD_JOB_CLEANUP_PRESERVED_JOBS_MAX_COUNT")
+    end
+
     test "merges enable_pauses from environment" do
       System.put_env("GOOD_JOB_ENABLE_PAUSES", "true")
 
@@ -240,6 +261,24 @@ defmodule GoodJob.Config.EnvTest do
       assert config.advisory_lock_heartbeat == true
 
       System.delete_env("GOOD_JOB_ADVISORY_LOCK_HEARTBEAT")
+    end
+
+    test "merges advisory_lock_function from environment" do
+      System.put_env("GOOD_JOB_ADVISORY_LOCK_FUNCTION", "pg_try_advisory_xact_lock")
+
+      config = Env.merge_env_vars(%{})
+      assert config.advisory_lock_function == "pg_try_advisory_xact_lock"
+
+      System.delete_env("GOOD_JOB_ADVISORY_LOCK_FUNCTION")
+    end
+
+    test "merges advisory_lock_hash_algorithm from environment" do
+      System.put_env("GOOD_JOB_ADVISORY_LOCK_HASH_ALGORITHM", "sha256")
+
+      config = Env.merge_env_vars(%{})
+      assert config.advisory_lock_hash_algorithm == "sha256"
+
+      System.delete_env("GOOD_JOB_ADVISORY_LOCK_HASH_ALGORITHM")
     end
   end
 end

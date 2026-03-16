@@ -38,7 +38,7 @@ defmodule HabitTracker.MixProject do
       {:phoenix_live_reload, "~> 1.4", only: :dev},
       {:gettext, "~> 0.20"},
       {:jason, "~> 1.4"},
-      {:plug_cowboy, "~> 2.5"},
+      {:plug_cowboy, "~> 2.8"},
       # GoodJob
       {:good_job, path: "../.."},
       # Phlex and StyleCapsule (from hex)
@@ -50,18 +50,24 @@ defmodule HabitTracker.MixProject do
       {:esbuild, "~> 0.8", runtime: Mix.env() == :dev},
       # Database
       {:ecto_sql, "~> 3.13"},
-      {:postgrex, "~> 0.21"},
+      {:postgrex, "~> 0.22"},
       {:ecto_psql_extras, "~> 0.7"}
     ]
   end
 
   defp aliases do
     [
+      start: ["phx.server"],
       setup: ["deps.get", "ecto.setup", "assets.build"],
       "ecto.setup": ["ecto.create", "ecto.migrate", "run priv/repo/seeds.exs"],
       "ecto.reset": ["ecto.drop", "ecto.setup"],
       "assets.build": ["style_capsule.build", "tailwind habit_tracker", "esbuild habit_tracker"],
-      "assets.deploy": ["style_capsule.build", "tailwind habit_tracker --minify", "esbuild habit_tracker --minify", "phx.digest"]
+      "assets.deploy": [
+        "style_capsule.build",
+        "tailwind habit_tracker --minify",
+        "esbuild habit_tracker --minify",
+        "phx.digest"
+      ]
     ]
   end
 end

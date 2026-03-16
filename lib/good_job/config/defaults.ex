@@ -28,8 +28,11 @@ defmodule GoodJob.Config.Defaults do
     queue_select_limit: nil,
     cleanup_discarded_jobs: true,
     cleanup_preserved_jobs_before_seconds_ago: 1_209_600,
+    cleanup_preserved_jobs_max_count: nil,
     enable_pauses: false,
     advisory_lock_heartbeat: false,
+    advisory_lock_function: :pg_try_advisory_xact_lock,
+    advisory_lock_hash_algorithm: :md5,
     external_jobs: %{}
   }
 

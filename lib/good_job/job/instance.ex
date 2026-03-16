@@ -5,6 +5,12 @@ defmodule GoodJob.Job.Instance do
   Created by `MyJob.new(args)` and executed with `.perform`.
   """
 
+  @type t :: %__MODULE__{
+          job_module: module(),
+          args: map() | list() | term(),
+          options: keyword()
+        }
+
   defstruct [:job_module, :args, :options]
 
   @doc """

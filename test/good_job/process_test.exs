@@ -1,7 +1,7 @@
 defmodule GoodJob.ProcessTest do
   use ExUnit.Case, async: false
 
-  alias GoodJob.{Process, Repo}
+  alias GoodJob.{AdvisoryLock, Process, Repo}
 
   setup do
     Ecto.Adapters.SQL.Sandbox.checkout(Repo.repo())
@@ -57,6 +57,30 @@ defmodule GoodJob.ProcessTest do
       {:ok, record1} = Process.find_or_create_record(id: id, with_advisory_lock: true)
       {:ok, record2} = Process.find_or_create_record(id: id, with_advisory_lock: true)
       assert record1.id == record2.id
+    end
+  end
+
+  describe "active/inactive" do
+    test "classifies advisory-locked process as active" do
+      Ecto.Adapters.SQL.Sandbox.checkout(Repo.repo())
+      id = Ecto.UUID.generate()
+      {:ok, record} = Process.find_or_create_record(id: id, with_advisory_lock: true)
+
+      active_ids =
+        Process.active()
+        |> Repo.repo().all()
+        |> Enum.map(& &1.id)
+
+      inactive_ids =
+        Process.inactive()
+        |> Repo.repo().all()
+        |> Enum.map(& &1.id)
+
+      assert record.id in active_ids
+      refute record.id in inactive_ids
+
+      lock_key = AdvisoryLock.hash_key(id)
+      assert AdvisoryLock.unlock_session(lock_key) in [true, false]
     end
   end
 end

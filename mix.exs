@@ -8,21 +8,13 @@ defmodule GoodJob.MixProject do
     [
       app: :good_job,
       version: @version,
-      elixir: "~> 1.18",
+      elixir: "~> 1.19",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       package: package(),
       description: description(),
       docs: docs(),
       aliases: aliases(),
-      preferred_cli_env: [
-        coveralls: :test,
-        "coveralls.json": :test,
-        "coveralls.html": :test,
-        "test.all": :test,
-        credo: :test,
-        dialyzer: :test
-      ],
       dialyzer: [
         plt_add_apps: [:mix, :ecto, :ecto_sql],
         ignore_warnings: ".dialyzer.ignore-warnings"
@@ -45,32 +37,45 @@ defmodule GoodJob.MixProject do
     ]
   end
 
+  def cli do
+    [
+      preferred_envs: [
+        coveralls: :test,
+        "coveralls.json": :test,
+        "coveralls.html": :test,
+        "test.all": :test,
+        credo: :test,
+        dialyzer: :test
+      ]
+    ]
+  end
+
   defp deps do
     [
       # Database
       {:ecto_sql, "~> 3.13"},
-      {:postgrex, "~> 0.21"},
+      {:postgrex, "~> 0.22"},
 
       # JSON
       {:jason, "~> 1.4"},
 
       # Telemetry
-      {:telemetry, "~> 1.3"},
+      {:telemetry, "~> 1.4"},
 
       # Phoenix dependencies (optional, for Phoenix integration)
       {:phoenix, "~> 1.8", optional: true},
       {:phoenix_live_view, "~> 1.1", optional: true},
       {:phoenix_html, "~> 4.3", optional: true},
       {:plug, "~> 1.19", optional: true},
-      {:plug_cowboy, "~> 2.7", optional: true},
+      {:plug_cowboy, "~> 2.8", optional: true},
 
       # Testing
-      {:stream_data, "~> 1.2", only: :test},
+      {:stream_data, "~> 1.3", only: :test},
 
       # Code quality
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
-      {:ex_doc, "~> 0.39", only: :dev, runtime: false},
+      {:ex_doc, "~> 0.40", only: :dev, runtime: false},
       {:excoveralls, "~> 0.18", only: :test, runtime: false},
       {:benchee, "~> 1.5", only: :dev, runtime: false},
       {:benchee_html, "~> 1.0", only: :dev, runtime: false}

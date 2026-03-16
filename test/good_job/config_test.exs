@@ -228,6 +228,13 @@ defmodule GoodJob.ConfigTest do
     end
   end
 
+  describe "cleanup_preserved_jobs_max_count/0" do
+    test "returns integer or nil" do
+      value = Config.cleanup_preserved_jobs_max_count()
+      assert is_integer(value) or is_nil(value)
+    end
+  end
+
   describe "enable_pauses?/0" do
     test "returns boolean" do
       result = Config.enable_pauses?()
@@ -239,6 +246,20 @@ defmodule GoodJob.ConfigTest do
     test "returns boolean" do
       result = Config.advisory_lock_heartbeat?()
       assert is_boolean(result)
+    end
+  end
+
+  describe "advisory_lock_function/0" do
+    test "returns configured lock function or default" do
+      value = Config.advisory_lock_function()
+      assert value in [:pg_try_advisory_xact_lock, "pg_try_advisory_xact_lock"]
+    end
+  end
+
+  describe "advisory_lock_hash_algorithm/0" do
+    test "returns configured hash algorithm or default" do
+      value = Config.advisory_lock_hash_algorithm()
+      assert value in [:md5, "md5"]
     end
   end
 

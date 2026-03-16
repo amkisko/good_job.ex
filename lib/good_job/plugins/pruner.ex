@@ -91,7 +91,8 @@ defmodule GoodJob.Plugins.Pruner do
     deleted_count =
       Cleanup.cleanup_preserved_jobs(
         older_than: max_age,
-        in_batches_of: max_count
+        in_batches_of: min(max_count, 1_000),
+        max_count: max_count
       )
 
     Logger.info("Pruned #{deleted_count} old job records")

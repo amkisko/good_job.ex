@@ -24,7 +24,7 @@ jobs:
           - 5432:5432
     env:
       DATABASE_URL: postgres://postgres:postgres@localhost:5432/good_job_test
-      ELIXIR_VERSION: "1.18"
+      ELIXIR_VERSION: "1.19.5"
       OTP_VERSION: "27"
       MIX_ENV: test
     steps:

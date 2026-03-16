@@ -38,8 +38,11 @@ defmodule GoodJob.Config do
     * `:queue_select_limit` - Number of jobs to query before acquiring advisory locks (default: `nil`, no limit)
     * `:cleanup_discarded_jobs` - Whether to automatically destroy discarded jobs (default: `true`)
     * `:cleanup_preserved_jobs_before_seconds_ago` - Seconds to preserve jobs before cleanup (default: `1_209_600` = 14 days)
+    * `:cleanup_preserved_jobs_max_count` - Maximum number of preserved jobs/executions to keep (default: `nil`, disabled)
     * `:enable_pauses` - Whether job processing can be paused (default: `false`)
     * `:advisory_lock_heartbeat` - Whether to use advisory lock for process heartbeat (default: `false`)
+    * `:advisory_lock_function` - PostgreSQL advisory lock function for transactional locks (default: `:pg_try_advisory_xact_lock`)
+    * `:advisory_lock_hash_algorithm` - Hash strategy for deriving advisory lock keys (default: `:md5`; supports `:md5`, `:sha1`, `:sha224`, `:sha256`, `:sha384`, `:sha512`, `:hashtextextended`, `:hashtext`, `:uuid_v5`)
     * `:external_jobs` - Map of external job class names (strings) to Elixir modules (atoms) for cross-language job resolution (default: `%{}`)
       Only needed for jobs enqueued from external languages (e.g., Ruby Rails, Zig). Elixir-native jobs are automatically resolved by module name at runtime.
       Example: `%{"ElixirProcessedJob" => MyApp.Jobs.ProcessJob}`
@@ -78,8 +81,11 @@ defmodule GoodJob.Config do
           queue_select_limit: pos_integer() | nil,
           cleanup_discarded_jobs: boolean(),
           cleanup_preserved_jobs_before_seconds_ago: pos_integer(),
+          cleanup_preserved_jobs_max_count: pos_integer() | nil,
           enable_pauses: boolean(),
           advisory_lock_heartbeat: boolean(),
+          advisory_lock_function: atom() | String.t(),
+          advisory_lock_hash_algorithm: atom() | String.t(),
           external_jobs: map()
         }
 
@@ -446,6 +452,15 @@ defmodule GoodJob.Config do
   end
 
   @doc """
+  Returns the maximum number of preserved jobs and executions to keep.
+
+  Defaults to `nil` (disabled).
+  """
+  def cleanup_preserved_jobs_max_count do
+    get(:cleanup_preserved_jobs_max_count, Defaults.get(:cleanup_preserved_jobs_max_count))
+  end
+
+  @doc """
   Returns whether job processing can be paused.
 
   Defaults to `false`.
@@ -470,6 +485,24 @@ defmodule GoodJob.Config do
       value ->
         value
     end
+  end
+
+  @doc """
+  Returns the PostgreSQL advisory lock function for transactional lock acquisition.
+
+  Defaults to `:pg_try_advisory_xact_lock`.
+  """
+  def advisory_lock_function do
+    get(:advisory_lock_function, Defaults.get(:advisory_lock_function))
+  end
+
+  @doc """
+  Returns the hash algorithm used to derive advisory lock keys.
+
+  Defaults to `:md5`.
+  """
+  def advisory_lock_hash_algorithm do
+    get(:advisory_lock_hash_algorithm, Defaults.get(:advisory_lock_hash_algorithm))
   end
 
   @doc """

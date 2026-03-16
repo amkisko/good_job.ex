@@ -5,6 +5,23 @@ defmodule GoodJob.Config.Validation do
 
   # Valid execution modes (aligned with Ruby GoodJob)
   @valid_execution_modes [:external, :async, :inline]
+  @valid_advisory_lock_functions ~w(
+    pg_try_advisory_xact_lock
+    pg_advisory_xact_lock
+    pg_try_advisory_lock
+    pg_advisory_lock
+  )
+  @valid_advisory_lock_hash_algorithms ~w(
+    md5
+    sha1
+    sha224
+    sha256
+    sha384
+    sha512
+    hashtextextended
+    hashtext
+    uuid_v5
+  )
 
   @doc """
   Validates configuration and raises if invalid.
@@ -18,12 +35,23 @@ defmodule GoodJob.Config.Validation do
     validate_queues!(config)
     validate_shutdown_timeout!(config)
     validate_cleanup_intervals!(config)
+    validate_cleanup_max_count!(config)
     validate_plugins!(config)
     validate_database_config!(config)
     validate_notifier_config!(config)
+    validate_advisory_lock_config!(config)
     validate_external_jobs!(config)
 
     config
+  end
+
+  defp validate_cleanup_max_count!(config) do
+    max_count = config[:cleanup_preserved_jobs_max_count]
+
+    if max_count && (not is_integer(max_count) or max_count < 1) do
+      raise ArgumentError,
+            "GoodJob cleanup_preserved_jobs_max_count must be a positive integer or nil. Got: #{inspect(max_count)}"
+    end
   end
 
   defp validate_repo!(config) do
@@ -187,6 +215,28 @@ defmodule GoodJob.Config.Validation do
          (not is_integer(notifier_keepalive_interval) or notifier_keepalive_interval < 1) do
       raise ArgumentError,
             "GoodJob notifier_keepalive_interval must be a positive integer (milliseconds). Got: #{inspect(notifier_keepalive_interval)}"
+    end
+  end
+
+  defp validate_advisory_lock_config!(config) do
+    advisory_lock_function = config[:advisory_lock_function]
+    normalized_lock_function = advisory_lock_function |> to_string() |> String.downcase()
+
+    if advisory_lock_function &&
+         normalized_lock_function not in @valid_advisory_lock_functions do
+      raise ArgumentError,
+            "GoodJob advisory_lock_function must be one of #{inspect(@valid_advisory_lock_functions)}. " <>
+              "Got: #{inspect(advisory_lock_function)}"
+    end
+
+    advisory_lock_hash_algorithm = config[:advisory_lock_hash_algorithm]
+    normalized_hash_algorithm = advisory_lock_hash_algorithm |> to_string() |> String.downcase()
+
+    if advisory_lock_hash_algorithm &&
+         normalized_hash_algorithm not in @valid_advisory_lock_hash_algorithms do
+      raise ArgumentError,
+            "GoodJob advisory_lock_hash_algorithm must be one of #{inspect(@valid_advisory_lock_hash_algorithms)}. " <>
+              "Got: #{inspect(advisory_lock_hash_algorithm)}"
     end
   end
 

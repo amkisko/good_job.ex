@@ -118,17 +118,25 @@ defmodule GoodJob do
               labels: tags
             }
 
-            case GoodJob.Job.enqueue(job_attrs) do
-              {:ok, job} ->
-                # Telemetry.enqueue is now emitted by Job.enqueue/1
-                # Execute after_enqueue callback
-                after_enqueue(callback_module, job, opts)
+            if execution_mode != :inline and GoodJob.Bulk.buffering?() do
+              GoodJob.Bulk.add(%{
+                job_attrs: job_attrs,
+                callback_module: callback_module,
+                opts: opts
+              })
+            else
+              case GoodJob.Job.enqueue(job_attrs) do
+                {:ok, job} ->
+                  # Telemetry.enqueue is now emitted by Job.enqueue/1
+                  # Execute after_enqueue callback
+                  after_enqueue(callback_module, job, opts)
 
-                # Execute based on mode (default async just enqueues).
-                GoodJob.ExecutionMode.execute(job, execution_mode, opts)
+                  # Execute based on mode (default async just enqueues).
+                  GoodJob.ExecutionMode.execute(job, execution_mode, opts)
 
-              error ->
-                error
+                error ->
+                  error
+              end
             end
 
           {:error, reason} ->
@@ -193,7 +201,6 @@ defmodule GoodJob do
   defp after_enqueue(nil, _job, _opts), do: :ok
   defp after_enqueue(job_module, job, opts), do: GoodJob.JobCallbacks.after_enqueue(job_module, job, opts)
 
-
   @doc """
   Shuts down all GoodJob processes gracefully.
 
@@ -219,7 +226,8 @@ defmodule GoodJob do
   ## Options
 
     * `:older_than` - Jobs older than this (in seconds) will be deleted. Default: 14 days
-    * `:include_discarded` - Whether to include discarded jobs. Default: `false`
+    * `:include_discarded` - Whether to include discarded jobs. Default: config `cleanup_discarded_jobs` (`true`)
+    * `:max_count` - Maximum number of preserved jobs/executions to keep. Default: config `cleanup_preserved_jobs_max_count` (`nil`)
   """
   def cleanup_preserved_jobs(opts \\ []) do
     GoodJob.Cleanup.cleanup_preserved_jobs(opts)
