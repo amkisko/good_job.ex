@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## 0.3.0
+
+- Introduce configurable advisory lock key derivation (lock function and hash strategy)
+- Add preserved-job cleanup by max-count limits
+- Implement `GoodJob.Bulk` API for buffered/atomic bulk enqueue workflows
+- Refine execution mode handling and application startup behavior
+- Update core and example dependencies to latest compatible versions
+
 ## 0.2.0
 
 - Update dependencies to the latest supported versions
