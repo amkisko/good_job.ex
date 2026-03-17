@@ -80,6 +80,12 @@ case GoodJob.TestRepo.start_link() do
   {:error, reason} -> raise "Failed to start GoodJob.TestRepo in test_helper: #{inspect(reason)}"
 end
 
+# Ensure optional PostgreSQL functions used by advisory lock hash strategies are available.
+# `pgcrypto` provides digest() for sha* algorithms and `uuid-ossp` provides uuid_generate_v5().
+for extension <- ["pgcrypto", "\"uuid-ossp\""] do
+  _ = GoodJob.TestRepo.query("CREATE EXTENSION IF NOT EXISTS #{extension}")
+end
+
 # Start minimal GoodJob processes needed for testing
 case Registry.start_link(keys: :unique, name: GoodJob.Registry) do
   {:ok, _} -> :ok

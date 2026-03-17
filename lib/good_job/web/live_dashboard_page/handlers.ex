@@ -43,7 +43,12 @@ defmodule GoodJob.Web.LiveDashboardPage.Handlers do
   Handles set poll interval event.
   """
   def handle_set_poll_interval(interval_str, socket) do
-    interval = String.to_integer(interval_str) * 1000
+    interval =
+      case Integer.parse(interval_str) do
+        {seconds, ""} when seconds > 0 -> seconds * 1000
+        _ -> socket.assigns.poll_interval
+      end
+
     socket = assign(socket, poll_interval: interval)
 
     if socket.assigns.polling do

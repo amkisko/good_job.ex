@@ -49,6 +49,10 @@ jobs:
             ${{ runner.os }}-beam-
       - run: mix deps.get
       - run: mix deps.compile
+      - name: Enable PostgreSQL extensions
+        run: |
+          psql "$DATABASE_URL" -c 'CREATE EXTENSION IF NOT EXISTS pgcrypto;'
+          psql "$DATABASE_URL" -c 'CREATE EXTENSION IF NOT EXISTS "uuid-ossp";'
       - run: mix test.setup
       - run: mix coveralls.json
       - uses: codecov/codecov-action@v5

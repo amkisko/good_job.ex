@@ -6,6 +6,7 @@ defmodule GoodJob.Telemetry.Logger do
   require Logger
 
   @default_handler_id "good-job-default-logger"
+  @all_event_categories [:job, :batch, :concurrency, :lock, :cron, :notifier, :scheduler, :cleanup, :process]
 
   @doc """
   The unique id used to attach telemetry logging.
@@ -22,44 +23,7 @@ defmodule GoodJob.Telemetry.Logger do
     events =
       case events_filter do
         :all ->
-          [
-            # Job execution events
-            [:good_job, :job, :start],
-            [:good_job, :job, :success],
-            [:good_job, :job, :error],
-            [:good_job, :job, :exception],
-            [:good_job, :job, :timeout],
-            # Job lifecycle events
-            [:good_job, :job, :enqueue],
-            [:good_job, :job, :retry],
-            [:good_job, :job, :retry_manual],
-            [:good_job, :job, :delete],
-            [:good_job, :job, :cancel],
-            [:good_job, :job, :discard],
-            [:good_job, :job, :snooze],
-            [:good_job, :job, :locked],
-            [:good_job, :job, :unlocked],
-            # Batch events
-            [:good_job, :batch, :enqueue],
-            [:good_job, :batch, :complete],
-            [:good_job, :batch, :callback],
-            [:good_job, :batch, :retry],
-            # Concurrency events
-            [:good_job, :concurrency, :limit_exceeded],
-            [:good_job, :concurrency, :throttle_exceeded],
-            # Scheduler events
-            [:good_job, :scheduler, :poll],
-            [:good_job, :scheduler, :job_fetched],
-            [:good_job, :scheduler, :job_not_found],
-            # Cron events
-            [:good_job, :cron, :enqueue],
-            # Notifier events
-            [:good_job, :notifier, :listen],
-            [:good_job, :notifier, :notified],
-            # Lock events
-            [:good_job, :lock, :acquired],
-            [:good_job, :lock, :failed]
-          ]
+          build_events_from_filter(@all_event_categories)
 
         filter when is_list(filter) ->
           build_events_from_filter(filter)

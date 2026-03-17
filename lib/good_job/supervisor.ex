@@ -55,7 +55,7 @@ defmodule GoodJob.Supervisor do
 
     # Check schedulers
     schedulers_shutdown? =
-      case Process.whereis(SchedulerSupervisor) do
+      case Process.whereis(GoodJob.Scheduler.Supervisor) do
         nil -> true
         pid -> check_schedulers_shutdown(pid)
       end
@@ -73,7 +73,7 @@ defmodule GoodJob.Supervisor do
   end
 
   defp shutdown_schedulers(timeout) do
-    case Process.whereis(SchedulerSupervisor) do
+    case Process.whereis(GoodJob.Scheduler.Supervisor) do
       nil ->
         :ok
 
