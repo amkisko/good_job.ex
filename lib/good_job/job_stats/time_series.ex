@@ -73,10 +73,9 @@ defmodule GoodJob.JobStats.TimeSeries do
     # Normalize DateTime keys for lookup to ensure exact matches
     labels = Enum.map(all_hours, &DatetimeHelpers.format_hour/1)
 
-    # Use a helper function to find matching data, accounting for potential microsecond differences
-    created = Enum.map(all_hours, &get_count_for_hour(created_data, &1))
-    completed = Enum.map(all_hours, &get_count_for_hour(completed_data, &1))
-    failed = Enum.map(all_hours, &get_count_for_hour(failed_data, &1))
+    created = Enum.map(all_hours, &hour_bucket_count(created_data, &1))
+    completed = Enum.map(all_hours, &hour_bucket_count(completed_data, &1))
+    failed = Enum.map(all_hours, &hour_bucket_count(failed_data, &1))
 
     %{
       labels: labels,
@@ -171,60 +170,30 @@ defmodule GoodJob.JobStats.TimeSeries do
     end)
   end
 
-  defp get_count_for_hour(data_map, hour) when is_struct(hour, DateTime) do
-    # Ensure hour is truncated (should already be, but be safe)
-    # Add defensive check in case hour is not actually a valid DateTime
-    normalized_hour =
-      try do
-        %{hour | minute: 0, second: 0, microsecond: {0, 0}}
-      rescue
-        _ ->
-          # If truncate fails, return 0 count
-          nil
-      end
-
-    # If normalized_hour is nil, return 0
-    if is_nil(normalized_hour) do
-      0
-    else
-      # Try exact match first
-      case Map.get(data_map, normalized_hour) do
-        nil ->
-          data_map
-          |> Enum.find_value(0, fn
-            {key, count} when is_struct(key, DateTime) ->
-              try do
-                normalized_key = %{key | minute: 0, second: 0, microsecond: {0, 0}}
-
-                if normalized_key == normalized_hour do
-                  count
-                else
-                  nil
-                end
-              rescue
-                _ -> nil
-              end
-
-            _ ->
-              nil
-          end)
-
-        count ->
-          # Handle Decimal or other numeric types
-          try do
-            if is_struct(count, Decimal) do
-              Decimal.to_integer(count)
-            else
-              trunc(count)
-            end
-          rescue
-            _ -> 0
-          end
-      end
+  defp hour_bucket_count(data_map, hour) when is_struct(hour, DateTime) do
+    case truncate_utc_hour(hour) do
+      nil -> 0
+      key -> Map.get(data_map, key, 0)
     end
   end
 
-  defp get_count_for_hour(_data_map, _hour), do: 0
+  defp hour_bucket_count(_data_map, _hour), do: 0
+
+  defp truncate_utc_hour(%DateTime{} = dt) do
+    %{dt | minute: 0, second: 0, microsecond: {0, 0}}
+  end
+
+  defp truncate_utc_hour(_), do: nil
+
+  defp normalize_count(count) when is_struct(count, Decimal), do: Decimal.to_integer(count)
+  defp normalize_count(count) when is_integer(count), do: count
+  defp normalize_count(count) when is_float(count), do: trunc(count)
+
+  defp normalize_count(count) do
+    trunc(count)
+  rescue
+    _ -> 0
+  end
 
   # Wrapper function to query hourly data and convert to map
   defp query_hourly_data(repo, sql, params) do
@@ -237,10 +206,22 @@ defmodule GoodJob.JobStats.TimeSeries do
     # Use SQL.query which provides better type decoding
     case SQL.query(repo, sql, params) do
       {:ok, %{rows: rows}} ->
-        rows
-        |> Enum.map(&process_hourly_row/1)
-        |> Enum.filter(&(!is_nil(&1)))
-        |> Map.new()
+        Enum.reduce(rows, %{}, fn row, acc ->
+          case process_hourly_row(row) do
+            nil ->
+              acc
+
+            {hour, count} ->
+              case truncate_utc_hour(hour) do
+                nil ->
+                  acc
+
+                key ->
+                  n = normalize_count(count)
+                  Map.update(acc, key, n, &(&1 + n))
+              end
+          end
+        end)
 
       _ ->
         %{}

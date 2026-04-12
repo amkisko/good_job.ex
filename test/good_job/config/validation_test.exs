@@ -47,9 +47,7 @@ defmodule GoodJob.Config.ValidationTest do
     test "validates external_jobs is a map" do
       config = Map.put(@base_config, :external_jobs, %{"External::Job" => MyApp.Job})
 
-      # Should not raise, returns config
       result = Validation.validate!(config)
-      assert is_map(result)
       assert result.external_jobs == %{"External::Job" => MyApp.Job}
     end
 
@@ -80,9 +78,7 @@ defmodule GoodJob.Config.ValidationTest do
     test "validates empty external_jobs map" do
       config = Map.put(@base_config, :external_jobs, %{})
 
-      # Should not raise, returns config
       result = Validation.validate!(config)
-      assert is_map(result)
       assert result.external_jobs == %{}
     end
 
@@ -93,27 +89,21 @@ defmodule GoodJob.Config.ValidationTest do
           "External::Job2" => MyApp.Job2
         })
 
-      # Should not raise, returns config
       result = Validation.validate!(config)
-      assert is_map(result)
       assert result.external_jobs == %{"External::Job1" => MyApp.Job1, "External::Job2" => MyApp.Job2}
     end
 
     test "handles nil external_jobs" do
       config = Map.put(@base_config, :external_jobs, nil)
 
-      # nil should be allowed (means not configured), returns config
       result = Validation.validate!(config)
-      assert is_map(result)
       assert result.external_jobs == nil
     end
 
     test "handles missing external_jobs key" do
       config = @base_config
 
-      # Should not raise when key is missing, returns config
       result = Validation.validate!(config)
-      assert is_map(result)
       refute Map.has_key?(result, :external_jobs)
     end
 
@@ -138,9 +128,10 @@ defmodule GoodJob.Config.ValidationTest do
     end
 
     test "validates additional advisory_lock_hash_algorithm strategies" do
-      assert Validation.validate!(Map.put(@base_config, :advisory_lock_hash_algorithm, :hashtextextended))
-      assert Validation.validate!(Map.put(@base_config, :advisory_lock_hash_algorithm, :hashtext))
-      assert Validation.validate!(Map.put(@base_config, :advisory_lock_hash_algorithm, :uuid_v5))
+      for algo <- [:hashtextextended, :hashtext, :uuid_v5] do
+        result = Validation.validate!(Map.put(@base_config, :advisory_lock_hash_algorithm, algo))
+        assert result.advisory_lock_hash_algorithm == algo
+      end
     end
 
     test "raises error when advisory_lock_hash_algorithm is unsupported" do

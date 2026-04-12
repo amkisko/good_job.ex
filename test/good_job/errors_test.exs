@@ -50,6 +50,11 @@ defmodule GoodJob.ErrorsTest do
       assert Errors.classify_error(error) == :discard
     end
 
+    test "classifies GoodJob.InterruptError as discard" do
+      error = GoodJob.InterruptError.exception("interrupted")
+      assert Errors.classify_error(error) == :discard
+    end
+
     test "classifies unknown errors as retry" do
       assert Errors.classify_error("unknown error") == :retry
       assert Errors.classify_error(%RuntimeError{message: "runtime error"}) == :retry
@@ -159,6 +164,10 @@ defmodule GoodJob.ErrorsTest do
     test "returns true for FunctionClauseError" do
       error = %FunctionClauseError{arity: 1, function: :test, module: __MODULE__}
       assert Errors.permanent_error?(error) == true
+    end
+
+    test "returns true for GoodJob.InterruptError" do
+      assert Errors.permanent_error?(GoodJob.InterruptError.exception("x")) == true
     end
 
     test "returns false for other errors" do

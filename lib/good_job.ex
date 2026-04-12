@@ -70,17 +70,7 @@ defmodule GoodJob do
     concurrency_result =
       if concurrency_key do
         config = get_concurrency_config(job_module, opts)
-
-        case GoodJob.Concurrency.check_enqueue_limit(concurrency_key, config) do
-          {:ok, :ok} ->
-            :ok
-
-          {:ok, {:error, reason}} ->
-            {:error, reason}
-
-          error ->
-            error
-        end
+        enqueue_concurrency_with_retry(concurrency_key, config, 5)
       else
         :ok
       end
@@ -200,6 +190,26 @@ defmodule GoodJob do
 
   defp after_enqueue(nil, _job, _opts), do: :ok
   defp after_enqueue(job_module, job, opts), do: GoodJob.JobCallbacks.after_enqueue(job_module, job, opts)
+
+  defp enqueue_concurrency_with_retry(concurrency_key, config, attempts) do
+    case GoodJob.Concurrency.check_enqueue_limit(concurrency_key, config) do
+      {:ok, :ok} ->
+        :ok
+
+      {:ok, {:error, reason}} ->
+        {:error, reason}
+
+      {:error, :lock_failed} when attempts > 1 ->
+        Process.sleep(10)
+        enqueue_concurrency_with_retry(concurrency_key, config, attempts - 1)
+
+      {:error, :lock_failed} ->
+        {:error, :lock_failed}
+
+      other ->
+        other
+    end
+  end
 
   @doc """
   Shuts down all GoodJob processes gracefully.

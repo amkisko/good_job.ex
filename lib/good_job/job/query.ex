@@ -148,16 +148,23 @@ defmodule GoodJob.Job.Query do
   """
   @spec queue_ordered(Ecto.Query.t() | module(), [String.t()]) :: Ecto.Query.t()
   def queue_ordered(query \\ Job, queues) when is_list(queues) do
-    case_clauses =
-      queues
-      |> Enum.with_index()
-      |> Enum.map_join(" ", fn {queue_name, index} ->
-        "WHEN queue_name = '#{String.replace(queue_name, "'", "''")}' THEN #{index}"
-      end)
+    case queues do
+      [] ->
+        query
 
-    case_sql = "(CASE #{case_clauses} ELSE #{length(queues)} END)"
+      queues ->
+        fallback = length(queues)
 
-    order_by(query, [j], asc: fragment(^case_sql))
+        order_by(query, [j],
+          asc:
+            fragment(
+              "COALESCE(array_position(?::text[], ?::text), ?::integer)",
+              type(^queues, {:array, :string}),
+              j.queue_name,
+              ^fallback
+            )
+        )
+    end
   end
 
   @doc """
@@ -271,13 +278,38 @@ defmodule GoodJob.Job.Query do
   end
 
   @doc """
-  Excludes paused queues (placeholder for future implementation).
+  Excludes jobs whose queue or job class is paused (when `enable_pauses` is configured).
+
+  When pauses are disabled in config, returns the query unchanged (no extra filters).
   """
   def exclude_paused(query \\ Job) do
-    case query do
-      %Ecto.Query{} -> query
-      _ -> from(j in Job)
+    base =
+      case query do
+        %Ecto.Query{} -> query
+        _ -> from(j in Job)
+      end
+
+    if GoodJob.Config.enable_pauses?() do
+      {paused_queues, paused_classes} = GoodJob.SettingManager.list_paused_filters()
+
+      base
+      |> exclude_paused_queues(paused_queues)
+      |> exclude_paused_job_classes(paused_classes)
+    else
+      base
     end
+  end
+
+  defp exclude_paused_queues(query, []), do: query
+
+  defp exclude_paused_queues(query, paused_queues) do
+    where(query, [j], j.queue_name not in ^paused_queues)
+  end
+
+  defp exclude_paused_job_classes(query, []), do: query
+
+  defp exclude_paused_job_classes(query, paused_classes) do
+    where(query, [j], j.job_class not in ^paused_classes)
   end
 
   @doc """

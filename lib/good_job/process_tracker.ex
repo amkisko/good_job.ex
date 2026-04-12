@@ -42,16 +42,13 @@ defmodule GoodJob.ProcessTracker do
     # Schedule refresh (but don't create record until needed)
     schedule_refresh()
 
-    {:ok, %{process_id: process_id, record_id: nil, locks: 0}}
+    {:ok, %{process_id: process_id, record_id: nil}}
   end
 
   @impl true
   def handle_call(:id_for_lock, _from, state) do
-    state = %{state | locks: state.locks + 1}
-
-    # Ensure record exists if we have locks
     record_id =
-      if state.locks > 0 and is_nil(state.record_id) do
+      if is_nil(state.record_id) do
         create_or_update_record(state.process_id)
       else
         state.record_id
@@ -62,7 +59,7 @@ defmodule GoodJob.ProcessTracker do
 
   @impl true
   def handle_info(:refresh, state) do
-    if state.locks > 0 and state.record_id do
+    if state.record_id do
       refresh_record(state.record_id)
       # Emit heartbeat telemetry
       Telemetry.process_heartbeat(state.process_id)

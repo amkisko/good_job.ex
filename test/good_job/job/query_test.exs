@@ -1,7 +1,8 @@
 defmodule GoodJob.Job.QueryTest do
   use GoodJob.Testing.JobCase, async: false
 
-  alias GoodJob.Job
+  import Ecto.Query
+  alias GoodJob.{Job, Repo}
 
   describe "query functions" do
     test "unfinished/1 returns query for unfinished jobs" do
@@ -374,6 +375,46 @@ defmodule GoodJob.Job.QueryTest do
     test "filters scheduled jobs" do
       query = Job.only_scheduled()
       assert %Ecto.Query{} = query
+    end
+  end
+
+  describe "queue_ordered/2" do
+    test "orders rows by queue list (array_position)" do
+      repo = Repo.repo()
+
+      {:ok, j_a} =
+        Job.enqueue(%{
+          active_job_id: Ecto.UUID.generate(),
+          job_class: "T",
+          queue_name: "queue_a",
+          serialized_params: %{"arguments" => []}
+        })
+
+      {:ok, j_b} =
+        Job.enqueue(%{
+          active_job_id: Ecto.UUID.generate(),
+          job_class: "T",
+          queue_name: "queue_b",
+          serialized_params: %{"arguments" => []}
+        })
+
+      {:ok, j_c} =
+        Job.enqueue(%{
+          active_job_id: Ecto.UUID.generate(),
+          job_class: "T",
+          queue_name: "queue_c",
+          serialized_params: %{"arguments" => []}
+        })
+
+      ordered_ids =
+        Job
+        |> Job.unfinished()
+        |> Job.queue_ordered(["queue_c", "queue_a", "queue_b"])
+        |> order_by([j], asc: j.inserted_at)
+        |> select([j], j.id)
+        |> repo.all()
+
+      assert ordered_ids == [j_c.id, j_a.id, j_b.id]
     end
   end
 

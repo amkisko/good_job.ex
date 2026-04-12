@@ -135,13 +135,7 @@ defmodule GoodJob.Web.LiveDashboardPage.Handlers do
   Handles bulk delete event.
   """
   def handle_bulk_delete(job_ids, socket) do
-    job_ids
-    |> Enum.each(fn job_id ->
-      case Job.find_by_id(job_id) do
-        nil -> :ok
-        job -> Job.delete(job)
-      end
-    end)
+    _ = Job.delete_many(job_ids)
 
     socket
     |> load_data_for_view(socket.assigns.view, nil, %{})
@@ -152,13 +146,7 @@ defmodule GoodJob.Web.LiveDashboardPage.Handlers do
   Handles bulk retry event.
   """
   def handle_bulk_retry(job_ids, socket) do
-    job_ids
-    |> Enum.each(fn job_id ->
-      case Job.find_by_id(job_id) do
-        nil -> :ok
-        job -> Job.retry(job)
-      end
-    end)
+    _ = Job.retry_many(job_ids)
 
     socket
     |> load_data_for_view(socket.assigns.view, nil, %{})

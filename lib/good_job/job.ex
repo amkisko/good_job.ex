@@ -7,6 +7,7 @@ defmodule GoodJob.Job do
 
   use Ecto.Schema
   import Ecto.Changeset
+  import Ecto.Query
 
   alias GoodJob.Job.{Instance, Query, State}
 
@@ -55,6 +56,8 @@ defmodule GoodJob.Job do
 
   def order_for_candidate_lookup(query \\ __MODULE__, parsed_queues \\ %{}),
     do: Query.order_for_candidate_lookup(query, parsed_queues)
+
+  def queue_ordered(query \\ __MODULE__, queues), do: Query.queue_ordered(query, queues)
 
   def in_batch(query \\ __MODULE__, batch_id), do: Query.in_batch(query, batch_id)
   def running(query \\ __MODULE__), do: Query.running(query)
@@ -142,8 +145,14 @@ defmodule GoodJob.Job do
 
   @doc """
   Enqueues a job.
+
+  ## Options
+
+    * `:listen_notify` - When `false`, skips `pg_notify` (PubSub and telemetry still run).
+      Used by `GoodJob.Bulk` to send a single notification after a batch insert.
   """
-  def enqueue(attrs) do
+  def enqueue(attrs, opts \\ []) do
+    listen_notify? = Keyword.get(opts, :listen_notify, true)
     repo = GoodJob.Repo.repo()
 
     case %__MODULE__{}
@@ -154,7 +163,7 @@ defmodule GoodJob.Job do
         GoodJob.PubSub.broadcast(:job_created, job.id)
         GoodJob.Telemetry.enqueue(job)
 
-        if GoodJob.Config.enable_listen_notify?() do
+        if listen_notify? and GoodJob.Config.enable_listen_notify?() do
           now = DateTime.utc_now()
           should_notify = is_nil(job.scheduled_at) or DateTime.compare(job.scheduled_at, now) != :gt
 
@@ -187,6 +196,32 @@ defmodule GoodJob.Job do
   end
 
   @doc """
+  Deletes multiple jobs in two queries (fetch by id, then delete all matching rows).
+
+  Emits the same PubSub and telemetry events per job as `delete/1`.
+  `ids` may be a list of `t:Ecto.UUID` strings (as returned from the database or UI).
+  """
+  @spec delete_many([Ecto.UUID.t() | String.t()]) :: {:ok, non_neg_integer()} | {:error, term()}
+  def delete_many(ids) when is_list(ids) do
+    repo = GoodJob.Repo.repo()
+    ids = normalize_id_list(ids)
+
+    if ids == [] do
+      {:ok, 0}
+    else
+      jobs = repo.all(from(j in __MODULE__, where: j.id in ^ids, select: j))
+      {count, _} = repo.delete_all(from(j in __MODULE__, where: j.id in ^ids))
+
+      Enum.each(jobs, fn job ->
+        GoodJob.PubSub.broadcast(:job_deleted, job.id)
+        GoodJob.Telemetry.job_delete(job)
+      end)
+
+      {:ok, count}
+    end
+  end
+
+  @doc """
   Retries a discarded job by clearing its finished_at and error fields.
   """
   def retry(job) do
@@ -215,6 +250,62 @@ defmodule GoodJob.Job do
           error
       end
     end
+  end
+
+  @doc """
+  Retries multiple jobs in one `UPDATE`, matching `retry/1` field changes.
+
+  Emits the same PubSub and telemetry events per job as `retry/1` (using structs
+  loaded before the update).
+  """
+  @spec retry_many([Ecto.UUID.t() | String.t()]) :: {:ok, non_neg_integer()} | {:error, term()}
+  def retry_many(ids) when is_list(ids) do
+    repo = GoodJob.Repo.repo()
+    ids = normalize_id_list(ids)
+
+    if ids == [] do
+      {:ok, 0}
+    else
+      jobs = repo.all(from(j in __MODULE__, where: j.id in ^ids, select: j))
+      now = DateTime.utc_now()
+
+      attrs = [
+        finished_at: nil,
+        error: nil,
+        performed_at: nil,
+        locked_by_id: nil,
+        locked_at: nil,
+        scheduled_at: now
+      ]
+
+      {count, _} = repo.update_all(from(j in __MODULE__, where: j.id in ^ids), set: attrs)
+
+      Enum.each(jobs, fn job ->
+        retried = %{
+          job
+          | finished_at: nil,
+            error: nil,
+            performed_at: nil,
+            locked_by_id: nil,
+            locked_at: nil,
+            scheduled_at: now
+        }
+
+        GoodJob.PubSub.broadcast(:job_retried, retried.id)
+        GoodJob.Telemetry.job_retry_manual(retried)
+      end)
+
+      {:ok, count}
+    end
+  end
+
+  defp normalize_id_list(ids) do
+    ids
+    |> Enum.map(fn
+      id when is_binary(id) -> id
+      id -> to_string(id)
+    end)
+    |> Enum.uniq()
   end
 
   # Macro functionality for `use GoodJob.Job`

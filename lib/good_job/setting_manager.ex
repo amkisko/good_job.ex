@@ -3,6 +3,7 @@ defmodule GoodJob.SettingManager do
   Manages job execution settings like pausing/unpausing queues.
   """
 
+  import Ecto.Query
   alias GoodJob.{Repo, SettingSchema}
 
   @doc """
@@ -49,6 +50,54 @@ defmodule GoodJob.SettingManager do
       true ->
         {:error, :invalid_options}
     end
+  end
+
+  @doc """
+  Returns paused queue names and job class names from `good_job_settings`.
+
+  Used by dequeue queries when `:enable_pauses` is true.
+  """
+  @spec list_paused_filters() :: {[String.t()], [String.t()]}
+  def list_paused_filters do
+    repo = Repo.repo()
+
+    queues =
+      from(s in SettingSchema,
+        where: like(s.key, "pause:queue:%"),
+        select: {s.key, s.value}
+      )
+      |> repo.all()
+      |> Enum.map(&paused_queue_from_row/1)
+      |> Enum.reject(&is_nil/1)
+      |> Enum.uniq()
+
+    classes =
+      from(s in SettingSchema,
+        where: like(s.key, "pause:job_class:%"),
+        select: {s.key, s.value}
+      )
+      |> repo.all()
+      |> Enum.map(&paused_job_class_from_row/1)
+      |> Enum.reject(&is_nil/1)
+      |> Enum.uniq()
+
+    {queues, classes}
+  end
+
+  defp paused_queue_from_row({_key, value}) when is_map(value) do
+    Map.get(value, :queue) || Map.get(value, "queue")
+  end
+
+  defp paused_queue_from_row({key, _}) when is_binary(key) do
+    String.replace_prefix(key, "pause:queue:", "")
+  end
+
+  defp paused_job_class_from_row({_key, value}) when is_map(value) do
+    Map.get(value, :job_class) || Map.get(value, "job_class")
+  end
+
+  defp paused_job_class_from_row({key, _}) when is_binary(key) do
+    String.replace_prefix(key, "pause:job_class:", "")
   end
 
   @doc """

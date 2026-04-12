@@ -185,18 +185,4 @@ defmodule GoodJob.Concurrency do
       job_id not in allowed_active_job_ids
     end
   end
-
-  defmodule ConcurrencyExceededError do
-    @moduledoc """
-    Exception raised when concurrency limit is exceeded.
-    """
-    defexception message: "Concurrency limit exceeded"
-  end
-
-  defmodule ThrottleExceededError do
-    @moduledoc """
-    Exception raised when throttle limit is exceeded.
-    """
-    defexception message: "Throttle limit exceeded"
-  end
 end

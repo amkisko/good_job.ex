@@ -12,6 +12,7 @@ defmodule GoodJob.Scheduler do
     CleanupTracker,
     Config,
     JobPerformer,
+    JobRecovery,
     ProcessTracker,
     Telemetry
   }
@@ -66,6 +67,8 @@ defmodule GoodJob.Scheduler do
         cleanup_interval_jobs: cleanup_interval_jobs
       )
 
+    lock_id = ProcessTracker.id_for_lock()
+
     state = %{
       queue_string: queue_string,
       max_processes: max_processes,
@@ -73,7 +76,8 @@ defmodule GoodJob.Scheduler do
       running_tasks: %{},
       shutdown: false,
       cleanup_tracker: cleanup_tracker,
-      wait_pid: nil
+      wait_pid: nil,
+      lock_id: lock_id
     }
 
     # Register with Poller
@@ -98,9 +102,7 @@ defmodule GoodJob.Scheduler do
       {:noreply, state}
     else
       if map_size(state.running_tasks) < state.max_processes do
-        lock_id = ProcessTracker.id_for_lock()
-
-        case JobPerformer.perform_next(state.queue_string, lock_id) do
+        case JobPerformer.perform_next(state.queue_string, state.lock_id) do
           {:ok, nil} ->
             schedule_poll(Config.poll_interval() * 1000)
             {:noreply, state}
@@ -108,7 +110,7 @@ defmodule GoodJob.Scheduler do
           {:ok, job} ->
             task =
               Task.Supervisor.async_nolink(state.task_supervisor, fn ->
-                case GoodJob.JobExecutor.execute(job, lock_id) do
+                case GoodJob.JobExecutor.execute(job, state.lock_id) do
                   {:ok, result} -> {:ok, result}
                   {:error, error} -> {:error, error}
                 end
@@ -313,9 +315,15 @@ defmodule GoodJob.Scheduler do
   end
 
   defp handle_job_error(job, reason) do
-    # Task crashed, create error execution
     if should_log_errors?() do
       Logger.error("Job task crashed for job #{job.id}: #{inspect(reason)}")
+    end
+
+    try do
+      JobRecovery.after_worker_crash(job, reason)
+    rescue
+      e ->
+        Logger.error("GoodJob JobRecovery.after_worker_crash failed for job #{job.id}: #{inspect(e)}")
     end
 
     :ok

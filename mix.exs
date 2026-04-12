@@ -1,7 +1,7 @@
 defmodule GoodJob.MixProject do
   use Mix.Project
 
-  @version "0.3.0"
+  @version "1.0.0"
   @source_url "https://github.com/amkisko/good_job.ex"
 
   def project do
@@ -19,14 +19,7 @@ defmodule GoodJob.MixProject do
         plt_add_apps: [:mix, :ecto, :ecto_sql],
         ignore_warnings: ".dialyzer.ignore-warnings"
       ],
-      test_coverage: [
-        tool: ExCoveralls,
-        ignore_paths: [
-          "lib/good_job/web",
-          "lib/good_job/testing.ex",
-          "lib/good_job/testing"
-        ]
-      ]
+      test_coverage: [tool: ExCoveralls]
     ]
   end
 
@@ -142,6 +135,7 @@ defmodule GoodJob.MixProject do
           GoodJob.Notifier,
           GoodJob.AdvisoryLock,
           GoodJob.ProcessTracker,
+          GoodJob.JobRecovery,
           GoodJob.Supervisor
         ],
         Features: [

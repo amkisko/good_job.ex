@@ -465,8 +465,8 @@ defmodule GoodJob.Concurrency.ComprehensiveTest do
     end
   end
 
-  describe "error types" do
-    test "returns ConcurrencyExceededError for limit exceeded" do
+  describe "enqueue limit and throttle results" do
+    test "returns :limit_exceeded when concurrency limit is exceeded" do
       # Create jobs to exceed limit
       {:ok, _job1} =
         Job.enqueue(%{
@@ -482,7 +482,7 @@ defmodule GoodJob.Concurrency.ComprehensiveTest do
       assert match?({:ok, {:error, :limit_exceeded}}, result)
     end
 
-    test "returns ThrottleExceededError for throttle exceeded" do
+    test "returns :throttle_exceeded when enqueue throttle is exceeded" do
       # Create job within throttle period
       {:ok, _job1} =
         Job.enqueue(%{

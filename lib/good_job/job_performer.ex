@@ -12,6 +12,8 @@ defmodule GoodJob.JobPerformer do
   alias GoodJob.{AdvisoryLock, Job, Repo}
   import Ecto.Query
 
+  @stale_lock_sweep_every 10
+
   @doc """
   Performs the next eligible job.
 
@@ -38,8 +40,7 @@ defmodule GoodJob.JobPerformer do
                |> Job.changeset(%{
                  locked_by_id: lock_id,
                  locked_at: now,
-                 performed_at: now,
-                 executions_count: (job.executions_count || 0) + 1
+                 performed_at: now
                })
                |> repo.update!()
                |> then(&repo.get!(Job, &1.id))
@@ -74,21 +75,13 @@ defmodule GoodJob.JobPerformer do
 
   defp select_and_lock_job_internal(repo, parsed_queues, _lock_id, limit) do
     now = DateTime.utc_now()
-    stale_lock_cutoff = DateTime.add(now, -60, :second)
-
-    repo.update_all(
-      from(j in Job,
-        where: is_nil(j.finished_at),
-        where: not is_nil(j.locked_by_id),
-        where: j.locked_at < ^stale_lock_cutoff
-      ),
-      set: [locked_by_id: nil, locked_at: nil, performed_at: nil]
-    )
+    maybe_release_stale_locks(repo)
 
     query =
       Job
       |> Job.unfinished()
       |> Job.unlocked()
+      |> Job.exclude_paused()
       |> filter_queues(parsed_queues)
       |> where([j], is_nil(j.scheduled_at) or j.scheduled_at <= ^now)
       |> Job.order_for_candidate_lookup(parsed_queues)
@@ -108,6 +101,32 @@ defmodule GoodJob.JobPerformer do
         nil
       end
     end)
+  end
+
+  defp maybe_release_stale_locks(repo) do
+    tick = :persistent_term.get({__MODULE__, :stale_lock_tick}, 0) + 1
+    :persistent_term.put({__MODULE__, :stale_lock_tick}, tick)
+
+    sweep? =
+      if Code.ensure_loaded?(Mix) and Mix.env() == :test do
+        true
+      else
+        rem(tick, @stale_lock_sweep_every) == 0
+      end
+
+    if sweep? do
+      now = DateTime.utc_now()
+      stale_lock_cutoff = DateTime.add(now, -60, :second)
+
+      repo.update_all(
+        from(j in Job,
+          where: is_nil(j.finished_at),
+          where: not is_nil(j.locked_by_id),
+          where: j.locked_at < ^stale_lock_cutoff
+        ),
+        set: [locked_by_id: nil, locked_at: nil, performed_at: nil]
+      )
+    end
   end
 
   defp filter_queues(query, %{include: queues}) when is_list(queues) do

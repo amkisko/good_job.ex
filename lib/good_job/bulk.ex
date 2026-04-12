@@ -104,7 +104,7 @@ defmodule GoodJob.Bulk do
 
     repo.transaction(fn ->
       Enum.reduce_while(entries, [], fn entry, acc ->
-        case GoodJob.Job.enqueue(entry.job_attrs) do
+        case GoodJob.Job.enqueue(entry.job_attrs, listen_notify: false) do
           {:ok, job} ->
             if is_atom(entry.callback_module) do
               GoodJob.JobCallbacks.after_enqueue(entry.callback_module, job, entry.opts)
@@ -119,8 +119,30 @@ defmodule GoodJob.Bulk do
       |> Enum.reverse()
     end)
     |> case do
-      {:ok, jobs} -> {:ok, jobs}
-      {:error, reason} -> {:error, reason}
+      {:ok, jobs} ->
+        notify_after_bulk_flush(jobs)
+        {:ok, jobs}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  defp notify_after_bulk_flush(jobs) when is_list(jobs) do
+    with true <- jobs != [],
+         true <- GoodJob.Config.enable_listen_notify?() do
+      now = DateTime.utc_now()
+
+      job =
+        Enum.find(jobs, fn j ->
+          is_nil(j.scheduled_at) or DateTime.compare(j.scheduled_at, now) != :gt
+        end)
+
+      if job do
+        job
+        |> GoodJob.Protocol.Notification.for_job()
+        |> GoodJob.Notifier.notify()
+      end
     end
   end
 end

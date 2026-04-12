@@ -25,10 +25,6 @@ defmodule GoodJob.Errors do
     defexception [:message]
   end
 
-  defmodule InterruptError do
-    defexception [:message]
-  end
-
   @doc """
   Classifies an error to determine if it should be retried.
 
@@ -55,6 +51,7 @@ defmodule GoodJob.Errors do
   def classify_error(%Ecto.Changeset{}), do: :discard
   def classify_error(%ArgumentError{}), do: :discard
   def classify_error(%FunctionClauseError{}), do: :discard
+  def classify_error(%GoodJob.InterruptError{}), do: :discard
   def classify_error(_), do: :retry
 
   @doc """
@@ -129,5 +126,6 @@ defmodule GoodJob.Errors do
   def permanent_error?(%Ecto.Changeset{}), do: true
   def permanent_error?(%ArgumentError{}), do: true
   def permanent_error?(%FunctionClauseError{}), do: true
+  def permanent_error?(%GoodJob.InterruptError{}), do: true
   def permanent_error?(_), do: false
 end

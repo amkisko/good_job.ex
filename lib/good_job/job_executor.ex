@@ -12,7 +12,7 @@ defmodule GoodJob.JobExecutor do
 
   require Logger
   import Ecto.Query
-  alias GoodJob.{Concurrency, Errors, Execution, Job, Repo, Telemetry, Utils}
+  alias GoodJob.{Concurrency, Errors, Execution, InterruptError, Job, Repo, Telemetry, Utils}
   alias GoodJob.JobExecutor.{ResultHandler, Timeout}
   alias GoodJob.Protocol.Deserializer
 
@@ -85,7 +85,7 @@ defmodule GoodJob.JobExecutor do
       if existing_performed_at do
         interrupt_error_string =
           Utils.format_error(
-            Errors.InterruptError.exception("Interrupted after starting perform at '#{existing_performed_at}'")
+            InterruptError.exception("Interrupted after starting perform at '#{existing_performed_at}'")
           )
 
         interrupt_duration = format_duration(System.monotonic_time() - start_time)
@@ -325,7 +325,59 @@ defmodule GoodJob.JobExecutor do
 
   defp extract_concurrency_config_from_params(serialized_params) when is_map(serialized_params) do
     []
+    |> maybe_put_concurrency_int(
+      :enqueue_limit,
+      Map.get(serialized_params, "good_job_enqueue_limit") || Map.get(serialized_params, :good_job_enqueue_limit)
+    )
+    |> maybe_put_concurrency_int(
+      :perform_limit,
+      Map.get(serialized_params, "good_job_perform_limit") || Map.get(serialized_params, :good_job_perform_limit)
+    )
+    |> maybe_put_concurrency_int(
+      :total_limit,
+      Map.get(serialized_params, "good_job_total_limit") || Map.get(serialized_params, :good_job_total_limit)
+    )
+    |> Keyword.merge(
+      concurrency_config_map_to_kw(
+        Map.get(serialized_params, "good_job_concurrency_config") ||
+          Map.get(serialized_params, :good_job_concurrency_config)
+      )
+    )
   end
 
   defp extract_concurrency_config_from_params(_), do: []
+
+  defp concurrency_config_map_to_kw(nil), do: []
+
+  defp concurrency_config_map_to_kw(%{} = m) do
+    Enum.reduce(m, [], fn
+      {"enqueue_limit", v}, acc -> maybe_put_concurrency_int(acc, :enqueue_limit, v)
+      {:enqueue_limit, v}, acc -> maybe_put_concurrency_int(acc, :enqueue_limit, v)
+      {"perform_limit", v}, acc -> maybe_put_concurrency_int(acc, :perform_limit, v)
+      {:perform_limit, v}, acc -> maybe_put_concurrency_int(acc, :perform_limit, v)
+      {"total_limit", v}, acc -> maybe_put_concurrency_int(acc, :total_limit, v)
+      {:total_limit, v}, acc -> maybe_put_concurrency_int(acc, :total_limit, v)
+      _, acc -> acc
+    end)
+  end
+
+  defp maybe_put_concurrency_int(kw, _key, nil), do: kw
+
+  defp maybe_put_concurrency_int(kw, key, val) do
+    case concurrency_int(val) do
+      nil -> kw
+      i -> Keyword.put(kw, key, i)
+    end
+  end
+
+  defp concurrency_int(v) when is_integer(v), do: v
+
+  defp concurrency_int(v) when is_binary(v) do
+    case Integer.parse(v) do
+      {i, _} -> i
+      _ -> nil
+    end
+  end
+
+  defp concurrency_int(_), do: nil
 end

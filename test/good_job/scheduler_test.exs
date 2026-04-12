@@ -65,7 +65,8 @@ defmodule GoodJob.SchedulerTest do
         running_tasks: %{},
         shutdown: false,
         cleanup_tracker: cleanup_tracker,
-        wait_pid: nil
+        wait_pid: nil,
+        lock_id: Ecto.UUID.generate()
       },
       overrides
     )

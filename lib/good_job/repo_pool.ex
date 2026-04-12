@@ -52,9 +52,9 @@ defmodule GoodJob.RepoPool do
   This should be called during application startup to ensure all connections
   in the pool have the correct settings.
   """
-  @spec configure_repo(Ecto.Repo.t()) :: :ok
+  @spec configure_repo(Ecto.Repo.t()) :: {:ok, keyword()}
   def configure_repo(_repo) do
-    :ok
+    {:ok, [after_connect: &set_timeouts/1]}
   end
 
   @doc """

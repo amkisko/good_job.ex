@@ -173,4 +173,65 @@ defmodule GoodJob.JobTest do
       assert match?({:ok, _job}, result)
     end
   end
+
+  describe "delete_many/1 and retry_many/1" do
+    test "delete_many removes matching rows and returns count" do
+      {:ok, j1} =
+        Job.enqueue(%{
+          active_job_id: Ecto.UUID.generate(),
+          job_class: "T",
+          queue_name: "default",
+          serialized_params: %{"arguments" => []}
+        })
+
+      {:ok, j2} =
+        Job.enqueue(%{
+          active_job_id: Ecto.UUID.generate(),
+          job_class: "T",
+          queue_name: "default",
+          serialized_params: %{"arguments" => []}
+        })
+
+      assert {:ok, 2} == Job.delete_many([j1.id, j2.id])
+      assert is_nil(Job.find_by_id(j1.id))
+      assert is_nil(Job.find_by_id(j2.id))
+    end
+
+    test "delete_many with no ids returns zero" do
+      assert {:ok, 0} == Job.delete_many([])
+    end
+
+    test "retry_many clears finished state for multiple jobs" do
+      repo = GoodJob.Repo.repo()
+      now = DateTime.utc_now()
+
+      {:ok, j1} =
+        Job.enqueue(%{
+          active_job_id: Ecto.UUID.generate(),
+          job_class: "T",
+          queue_name: "default",
+          serialized_params: %{"arguments" => []}
+        })
+
+      {:ok, j2} =
+        Job.enqueue(%{
+          active_job_id: Ecto.UUID.generate(),
+          job_class: "T",
+          queue_name: "default",
+          serialized_params: %{"arguments" => []}
+        })
+
+      _ = repo.update!(Job.changeset(j1, %{finished_at: now, error: "e1"}))
+      _ = repo.update!(Job.changeset(j2, %{finished_at: now, error: "e2"}))
+
+      assert {:ok, 2} == Job.retry_many([j1.id, j2.id])
+
+      f1 = Job.find_by_id(j1.id)
+      f2 = Job.find_by_id(j2.id)
+      assert is_nil(f1.finished_at)
+      assert is_nil(f1.error)
+      assert is_nil(f2.finished_at)
+      assert is_nil(f2.error)
+    end
+  end
 end
