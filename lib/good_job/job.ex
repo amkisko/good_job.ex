@@ -148,6 +148,9 @@ defmodule GoodJob.Job do
   @doc """
   Enqueues a job.
 
+  This inserts the row only; it does not run `GoodJob.Concurrency` checks. Use `GoodJob.enqueue/3`
+  when you need per-key enqueue limits enforced before insert.
+
   ## Options
 
     * `:listen_notify` - When `false`, skips `pg_notify` (PubSub and telemetry still run).

@@ -47,8 +47,8 @@ defmodule GoodJob do
 
       GoodJob.enqueue(MyApp.MyJob, %{data: "hello"}, queue: "high_priority", priority: 1)
 
-      # With concurrency control
-      GoodJob.enqueue(MyApp.MyJob, %{data: "hello"}, concurrency_key: "user_123", concurrency_limit: 5)
+      # With concurrency control (limits from module or opts; see :concurrency_config)
+      GoodJob.enqueue(MyApp.MyJob, %{data: "hello"}, concurrency_key: "user_123", concurrency_config: [total_limit: 5])
 
       # Execute inline (synchronously)
       GoodJob.enqueue(MyApp.MyJob, %{data: "hello"}, execution_mode: :inline)

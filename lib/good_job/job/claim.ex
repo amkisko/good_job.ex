@@ -3,6 +3,8 @@ defmodule GoodJob.Job.Claim do
 
   import Ecto.Query
 
+  require Logger
+
   alias GoodJob.{AdvisoryLock, Job, JobPerformer}
 
   @lock_type_skiplocked 1
@@ -42,15 +44,11 @@ defmodule GoodJob.Job.Claim do
     candidates = repo.all(query)
 
     Enum.find_value(candidates, fn job ->
-      if is_nil(job.finished_at) do
-        lock_key = AdvisoryLock.job_id_to_lock_key(job.id)
+      lock_key = AdvisoryLock.job_id_to_lock_key(job.id)
 
-        case AdvisoryLock.lock(lock_key) do
-          true -> job
-          false -> nil
-        end
-      else
-        nil
+      case AdvisoryLock.lock(lock_key) do
+        true -> job
+        false -> nil
       end
     end)
   end
@@ -60,8 +58,15 @@ defmodule GoodJob.Job.Claim do
     {sql, params} = skip_locked_claim_sql(repo, parsed_queues, lock_id, now, @lock_type_skiplocked)
 
     case Ecto.Adapters.SQL.query(repo, sql, params) do
-      {:ok, %{rows: [[id] | _]}} -> repo.get(Job, id)
-      _ -> nil
+      {:ok, %{rows: [[id] | _]}} ->
+        repo.get(Job, id)
+
+      {:ok, %{rows: _}} ->
+        nil
+
+      {:error, err} ->
+        Logger.warning("GoodJob.Job.Claim skip_locked claim query failed: #{inspect(err)}")
+        nil
     end
   end
 
@@ -79,7 +84,11 @@ defmodule GoodJob.Job.Claim do
             unlock_hybrid_session_advisory(repo, conn, id)
             id
 
-          _ ->
+          {:ok, %{rows: _}} ->
+            nil
+
+          {:error, err} ->
+            Logger.warning("GoodJob.Job.Claim hybrid claim query failed: #{inspect(err)}")
             nil
         end
       end)
@@ -105,6 +114,9 @@ defmodule GoodJob.Job.Claim do
     {sql, inner_params ++ [lock_id, now, lock_type]}
   end
 
+  # Session `pg_try_advisory_lock` in SQL uses the MD5 expression below. It does not follow
+  # `GoodJob.Config.advisory_lock_hash_algorithm` (that applies to Elixir `AdvisoryLock` and
+  # `:advisory` dequeue). See `GoodJob.Config` docs for `:lock_strategy` / `:advisory_lock_hash_algorithm`.
   defp hybrid_claim_sql(repo, parsed_queues, lock_id, now, lock_type) do
     {inner_sql, inner_params} = candidate_select_sql(repo, parsed_queues, now)
     k = length(inner_params)
@@ -143,6 +155,7 @@ defmodule GoodJob.Job.Claim do
     Ecto.Adapters.SQL.to_sql(:all, repo, q)
   end
 
+  # Fixed MD5-based bigint; must match `AdvisoryLock` default job-id derivation for consistency.
   defp hybrid_advisory_lock_expr do
     "('x' || substr(md5('good_jobs' || '-' || id::text), 1, 16))::bit(64)::bigint"
   end

@@ -73,6 +73,12 @@ defmodule GoodJob.JobExecutor do
               concurrency_key: job.concurrency_key
             }
 
+          {:ok, {:error, :lock_failed}} ->
+            raise %Errors.ConcurrencyLockFailedError{
+              message: "Concurrency advisory lock not acquired for key: #{job.concurrency_key}",
+              concurrency_key: job.concurrency_key
+            }
+
           error ->
             raise %Errors.ConfigurationError{
               message: "Concurrency check failed: #{inspect(error)}"
@@ -311,6 +317,7 @@ defmodule GoodJob.JobExecutor do
 
   defp concurrency_error?(%Errors.ConcurrencyExceededError{}), do: true
   defp concurrency_error?(%Errors.ThrottleExceededError{}), do: true
+  defp concurrency_error?(%Errors.ConcurrencyLockFailedError{}), do: true
   defp concurrency_error?(_), do: false
 
   defp get_concurrency_config(job) do

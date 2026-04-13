@@ -13,6 +13,11 @@ defmodule GoodJob.Errors do
     defexception [:message, :concurrency_key]
   end
 
+  defmodule ConcurrencyLockFailedError do
+    @moduledoc false
+    defexception [:message, :concurrency_key]
+  end
+
   defmodule ConfigurationError do
     defexception [:message]
   end
@@ -52,6 +57,7 @@ defmodule GoodJob.Errors do
   def classify_error(%ArgumentError{}), do: :discard
   def classify_error(%FunctionClauseError{}), do: :discard
   def classify_error(%GoodJob.InterruptError{}), do: :discard
+  def classify_error(%__MODULE__.ConcurrencyLockFailedError{}), do: :retry
   def classify_error(_), do: :retry
 
   @doc """

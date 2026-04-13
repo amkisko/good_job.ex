@@ -301,6 +301,12 @@ config :good_job,
 
 See [config/prod.exs.example](config/prod.exs.example) for a complete configuration example with all available options.
 
+### Stale locks and enqueue concurrency retries
+
+- **`stale_lock_release_after_seconds`** (default `60`) and **`GOOD_JOB_STALE_LOCK_RELEASE_AFTER_SECONDS`** control how long a `good_jobs` row may stay locked before the worker’s periodic sweep clears `locked_by_id` / `locked_at` / `performed_at` for rows that look abandoned. Increase this if your jobs routinely run longer than the default window while holding the row lock.
+
+- **`GoodJob.enqueue/3`** with a **`concurrency_key`** runs a concurrency limit check inside `Ecto.Repo.transaction/1`. If another connection holds the per-key advisory lock, the check can return `{:ok, {:error, :lock_failed}}` (Ecto’s arity-0 transaction wrapper). GoodJob retries that case a few times with a short sleep so transient contention does not fail the enqueue immediately.
+
 ### Advisory Lock Configuration
 
 - `:advisory_lock_function` controls advisory lock acquisition for transactional lock paths (job claims and concurrency checks). Default: `:pg_try_advisory_xact_lock`.
@@ -313,6 +319,8 @@ Environment variables:
 - `GOOD_JOB_ADVISORY_LOCK_HASH_ALGORITHM`
 
 Notes:
+
+- `:hybrid` dequeue embeds a fixed MD5-based advisory lock expression in SQL for candidate rows. It does not use `:advisory_lock_hash_algorithm` (that setting applies to Elixir `AdvisoryLock` and `:advisory` claims). Use one `:lock_strategy` per database.
 
 - `hashtextextended` requires PostgreSQL 11+.
 - `hashtext` is available in all supported PostgreSQL versions (and documented at least since PostgreSQL 9.6).

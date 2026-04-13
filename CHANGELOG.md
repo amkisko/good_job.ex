@@ -14,7 +14,8 @@
 - Maintain `executions_count` only in the executor path; `JobPerformer` no longer increments it when claiming jobs, aligning attempt counts with retries and `max_attempts`.
 - Throttle stale-lock cleanup in production while performing a sweep on each attempt in the test environment for deterministic tests.
 - Resolve the process lock identifier once per scheduler at startup via `ProcessTracker.id_for_lock/0` and reuse it for claims; simplify process-tracker state by removing the prior per-poll lock counter.
-- Retry concurrency-gated enqueue when advisory lock acquisition returns `lock_failed`, using bounded attempts and a short delay between tries.
+- Concurrency-gated enqueue retries on advisory lock contention: `GoodJob.enqueue/3` matches `{:ok, {:error, :lock_failed}}` from Ecto `Repo.transaction/1` (arity 0), with bounded retries and a short delay between attempts.
+- `stale_lock_release_after_seconds` / `GOOD_JOB_STALE_LOCK_RELEASE_AFTER_SECONDS` (default 60) configures how old a row lock may be before the periodic stale-lock sweep clears `locked_by_id` (raise for jobs that run longer than a minute without updating lock state).
 - Support `listen_notify: false` on `Job.enqueue/2` for bulk inserts and emit a single PostgreSQL `NOTIFY` after the batch transaction commits.
 - Parse concurrency limits from `serialized_params` (including `good_job_*` fields and `good_job_concurrency_config`) for jobs enqueued from other runtimes using the same serialization.
 - Implement `GoodJob.RepoPool.configure_repo/1` to return `{:ok, after_connect: &GoodJob.RepoPool.set_timeouts/1}` for optional per-connection statement and lock timeouts.

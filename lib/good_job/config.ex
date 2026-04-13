@@ -42,11 +42,11 @@ defmodule GoodJob.Config do
     * `:enable_pauses` - Whether job processing can be paused (default: `false`)
     * `:advisory_lock_heartbeat` - Whether to use advisory lock for process heartbeat (default: `false`)
     * `:advisory_lock_function` - PostgreSQL advisory lock function for transactional locks (default: `:pg_try_advisory_xact_lock`)
-    * `:advisory_lock_hash_algorithm` - Hash strategy for deriving advisory lock keys (default: `:md5`; supports `:md5`, `:sha1`, `:sha224`, `:sha256`, `:sha384`, `:sha512`, `:hashtextextended`, `:hashtext`, `:uuid_v5`)
+    * `:advisory_lock_hash_algorithm` - Hash strategy for deriving advisory lock keys in Elixir (`GoodJob.AdvisoryLock`) and for job-id locks in `:advisory` dequeue (default: `:md5`; supports `:md5`, `:sha1`, `:sha224`, `:sha256`, `:sha384`, `:sha512`, `:hashtextextended`, `:hashtext`, `:uuid_v5`). The `:hybrid` dequeue SQL uses a fixed MD5 expression for `pg_try_advisory_lock` on candidate rows; it does not read this setting.
     * `:external_jobs` - Map of external job class names (strings) to Elixir modules (atoms) for cross-language job resolution (default: `%{}`)
       Only needed for jobs enqueued from external languages (e.g., Ruby Rails, Zig). Elixir-native jobs are automatically resolved by module name at runtime.
       Example: `%{"ElixirProcessedJob" => MyApp.Jobs.ProcessJob}`
-    * `:lock_strategy` - Job dequeue locking: `:advisory` (default), `:skiplocked`, or `:hybrid`. Environment: `GOOD_JOB_LOCK_STRATEGY`
+    * `:lock_strategy` - Job dequeue locking: `:advisory` (default), `:skiplocked`, or `:hybrid`. Environment: `GOOD_JOB_LOCK_STRATEGY`. Use one strategy per database; mixing strategies across workers is unsupported.
     * `:idle_timeout` - When set (positive integer seconds), stops `GoodJob.Supervisor` after no job execution and no running workers for this duration. Default: `nil` (disabled). Environment: `GOOD_JOB_IDLE_TIMEOUT`
     * `:stale_lock_release_after_seconds` - How stale a row lock must be before the periodic sweep clears `locked_by_id` (default: `60`). Increase for jobs that run longer than a minute without updating lock state. Environment: `GOOD_JOB_STALE_LOCK_RELEASE_AFTER_SECONDS`
   """

@@ -55,6 +55,11 @@ defmodule GoodJob.ErrorsTest do
       assert Errors.classify_error(error) == :discard
     end
 
+    test "classifies ConcurrencyLockFailedError as retry" do
+      error = %Errors.ConcurrencyLockFailedError{message: "x", concurrency_key: "k"}
+      assert Errors.classify_error(error) == :retry
+    end
+
     test "classifies unknown errors as retry" do
       assert Errors.classify_error("unknown error") == :retry
       assert Errors.classify_error(%RuntimeError{message: "runtime error"}) == :retry
@@ -194,6 +199,16 @@ defmodule GoodJob.ErrorsTest do
       }
 
       assert error.message == "throttle exceeded"
+      assert error.concurrency_key == "test_key"
+    end
+
+    test "ConcurrencyLockFailedError can be raised" do
+      error = %Errors.ConcurrencyLockFailedError{
+        message: "lock not acquired",
+        concurrency_key: "test_key"
+      }
+
+      assert error.message == "lock not acquired"
       assert error.concurrency_key == "test_key"
     end
 
