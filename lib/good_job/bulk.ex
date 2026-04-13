@@ -2,7 +2,7 @@ defmodule GoodJob.Bulk do
   @moduledoc """
   Buffers and enqueues multiple jobs together.
 
-  This mirrors the Ruby GoodJob::Bulk API:
+  This mirrors the upstream GoodJob::Bulk API:
   - `capture/1` captures jobs enqueued within a block.
   - `enqueue/1` captures jobs and inserts them atomically in one transaction.
   - `enqueue/1` also accepts a list of `%GoodJob.Job.Instance{}`.
@@ -128,7 +128,10 @@ defmodule GoodJob.Bulk do
     end
   end
 
-  defp notify_after_bulk_flush(jobs) when is_list(jobs) do
+  @doc false
+  def notify_after_bulk_flush(jobs) when is_list(jobs), do: notify_after_bulk_flush_impl(jobs)
+
+  defp notify_after_bulk_flush_impl(jobs) when is_list(jobs) do
     with true <- jobs != [],
          true <- GoodJob.Config.enable_listen_notify?() do
       now = DateTime.utc_now()
@@ -145,4 +148,6 @@ defmodule GoodJob.Bulk do
       end
     end
   end
+
+  defp notify_after_bulk_flush_impl(_), do: :ok
 end

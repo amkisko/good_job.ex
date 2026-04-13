@@ -1,9 +1,9 @@
 defmodule GoodJob.Protocol do
   @moduledoc """
-  GoodJob Ruby protocol helpers (internal/advanced use).
+  GoodJob protocol helpers (internal/advanced use).
 
   This module provides low-level helpers for enqueueing jobs that follow the
-  GoodJob Ruby protocol and ActiveJob conventions. All conversions and transformations
+  GoodJob and ActiveJob conventions. All conversions and transformations
   follow good_job and active_job conventions.
 
   **Note:** For most use cases, prefer using descriptor modules with `perform_later/1`:

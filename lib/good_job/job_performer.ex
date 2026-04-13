@@ -9,7 +9,7 @@ defmodule GoodJob.JobPerformer do
   - Handling retries
   """
 
-  alias GoodJob.{AdvisoryLock, Job, Repo}
+  alias GoodJob.{Job, Repo}
   import Ecto.Query
 
   @stale_lock_sweep_every 10
@@ -25,39 +25,61 @@ defmodule GoodJob.JobPerformer do
         GoodJob.Config.queue_select_limit() ||
         1000
 
+    lock_strategy = Keyword.get(opts, :lock_strategy, GoodJob.Config.lock_strategy())
     parsed_queues = parse_queues(queue_string)
     repo = Repo.repo()
 
-    case repo.transaction(fn ->
-           case select_and_lock_job(repo, parsed_queues, lock_id, queue_select_limit) do
-             nil ->
-               nil
+    maybe_release_stale_locks(repo)
 
-             job ->
-               now = DateTime.utc_now()
+    case lock_strategy do
+      :advisory ->
+        case repo.transaction(fn ->
+               case GoodJob.Job.Claim.claim_next(repo, parsed_queues, lock_id, :advisory,
+                      queue_select_limit: queue_select_limit
+                    ) do
+                 nil ->
+                   nil
 
-               job
-               |> Job.changeset(%{
-                 locked_by_id: lock_id,
-                 locked_at: now,
-                 performed_at: now
-               })
-               |> repo.update!()
-               |> then(&repo.get!(Job, &1.id))
-           end
-         end) do
-      {:ok, nil} ->
-        GoodJob.Telemetry.scheduler_job_not_found(queue_string)
-        {:ok, nil}
+                 job ->
+                   now = DateTime.utc_now()
 
-      {:ok, job} ->
-        GoodJob.Telemetry.scheduler_job_fetched(job, queue_string)
-        GoodJob.Telemetry.job_locked(job, lock_id)
-        GoodJob.PubSub.broadcast(:job_updated, job.id)
-        {:ok, job}
+                   job
+                   |> Job.changeset(%{
+                     locked_by_id: lock_id,
+                     locked_at: now,
+                     performed_at: now,
+                     lock_type: nil
+                   })
+                   |> repo.update!()
+                   |> then(&repo.get!(Job, &1.id))
+               end
+             end) do
+          {:ok, nil} ->
+            GoodJob.Telemetry.scheduler_job_not_found(queue_string)
+            {:ok, nil}
 
-      {:error, error} ->
-        {:error, error}
+          {:ok, job} ->
+            GoodJob.Telemetry.scheduler_job_fetched(job, queue_string)
+            GoodJob.Telemetry.job_locked(job, lock_id)
+            GoodJob.PubSub.broadcast(:job_updated, job.id)
+            {:ok, job}
+
+          {:error, error} ->
+            {:error, error}
+        end
+
+      other when other in [:skiplocked, :hybrid] ->
+        case GoodJob.Job.Claim.claim_next(repo, parsed_queues, lock_id, other, []) do
+          nil ->
+            GoodJob.Telemetry.scheduler_job_not_found(queue_string)
+            {:ok, nil}
+
+          job ->
+            GoodJob.Telemetry.scheduler_job_fetched(job, queue_string)
+            GoodJob.Telemetry.job_locked(job, lock_id)
+            GoodJob.PubSub.broadcast(:job_updated, job.id)
+            {:ok, job}
+        end
     end
   end
 
@@ -66,44 +88,13 @@ defmodule GoodJob.JobPerformer do
     repo = Repo.repo()
     parsed_queues = parse_queues(queue_string)
     limit = GoodJob.Config.queue_select_limit() || 1000
-    select_and_lock_job_internal(repo, parsed_queues, lock_id, limit)
-  end
-
-  defp select_and_lock_job(repo, parsed_queues, lock_id, limit) do
-    select_and_lock_job_internal(repo, parsed_queues, lock_id, limit)
-  end
-
-  defp select_and_lock_job_internal(repo, parsed_queues, _lock_id, limit) do
-    now = DateTime.utc_now()
     maybe_release_stale_locks(repo)
 
-    query =
-      Job
-      |> Job.unfinished()
-      |> Job.unlocked()
-      |> Job.exclude_paused()
-      |> filter_queues(parsed_queues)
-      |> where([j], is_nil(j.scheduled_at) or j.scheduled_at <= ^now)
-      |> Job.order_for_candidate_lookup(parsed_queues)
-      |> limit(^limit)
-
-    candidates = repo.all(query)
-
-    Enum.find_value(candidates, fn job ->
-      if is_nil(job.finished_at) do
-        lock_key = AdvisoryLock.job_id_to_lock_key(job.id)
-
-        case AdvisoryLock.lock(lock_key) do
-          true -> job
-          false -> nil
-        end
-      else
-        nil
-      end
-    end)
+    GoodJob.Job.Claim.claim_next(repo, parsed_queues, lock_id, :advisory, queue_select_limit: limit)
   end
 
-  defp maybe_release_stale_locks(repo) do
+  @doc false
+  def maybe_release_stale_locks(repo) do
     tick = :persistent_term.get({__MODULE__, :stale_lock_tick}, 0) + 1
     :persistent_term.put({__MODULE__, :stale_lock_tick}, tick)
 
@@ -124,12 +115,13 @@ defmodule GoodJob.JobPerformer do
           where: not is_nil(j.locked_by_id),
           where: j.locked_at < ^stale_lock_cutoff
         ),
-        set: [locked_by_id: nil, locked_at: nil, performed_at: nil]
+        set: [locked_by_id: nil, locked_at: nil, performed_at: nil, lock_type: nil]
       )
     end
   end
 
-  defp filter_queues(query, %{include: queues}) when is_list(queues) do
+  @doc false
+  def filter_queues(query, %{include: queues}) when is_list(queues) do
     {invalid_patterns, exact_queues} =
       Enum.split_with(queues, fn queue ->
         String.contains?(queue, "*") and queue != "*"
@@ -151,11 +143,11 @@ defmodule GoodJob.JobPerformer do
     end
   end
 
-  defp filter_queues(query, %{exclude: queues}) when is_list(queues) do
+  def filter_queues(query, %{exclude: queues}) when is_list(queues) do
     where(query, [j], j.queue_name not in ^queues)
   end
 
-  defp filter_queues(query, _) do
+  def filter_queues(query, _) do
     query
   end
 
@@ -177,12 +169,12 @@ defmodule GoodJob.JobPerformer do
   """
   def parse_queues("*"), do: %{}
 
-  # Support Ruby-style exclude syntax like "*,!excluded" by translating it into
-  # the internal "-excluded" format that the rest of the parser understands.
+  # Support exclude syntax like "*,!excluded" by translating it into the internal
+  # "-excluded" format that the rest of the parser understands.
   def parse_queues(queue_string) when is_binary(queue_string) do
     queue_string = String.trim(queue_string)
 
-    # When the queue string includes "!" (Ruby-style excludes), normalise it
+    # When the queue string includes "!" (exclude patterns), normalise it
     # first and then delegate to the main parser.
     if String.contains?(queue_string, "!") do
       parse_queues_with_excludes(queue_string)

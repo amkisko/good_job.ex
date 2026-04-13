@@ -482,7 +482,7 @@ defmodule GoodJob.JobExecutor.ResultHandler do
     if function_exported?(job_module, :backoff, 1) do
       job_module.backoff(attempt)
     else
-      # Default to constant 3 seconds to match Ruby GoodJob's ActiveJob default
+      # Default to constant 3 seconds (ActiveJob `retry_on` default wait)
       GoodJob.Backoff.constant(attempt)
     end
   end

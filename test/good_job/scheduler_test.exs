@@ -9,6 +9,7 @@ defmodule GoodJob.SchedulerTest do
     def get(schema, id), do: GoodJob.TestRepo.get(schema, id)
     def insert!(changeset), do: GoodJob.TestRepo.insert!(changeset)
     def update!(changeset), do: GoodJob.TestRepo.update!(changeset)
+    def update_all(query, opts), do: GoodJob.TestRepo.update_all(query, opts)
   end
 
   defmodule CountServer do

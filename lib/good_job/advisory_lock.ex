@@ -169,6 +169,21 @@ defmodule GoodJob.AdvisoryLock do
     end
   end
 
+  @doc """
+  Takes a **blocking** `pg_advisory_xact_lock` on the hash of `batch_id` (UUID).
+
+  Must run inside the same `Repo.transaction/1` as updates to the batch row.
+  """
+  def lock_batch_record_tx!(repo, batch_id) when is_binary(batch_id) do
+    case job_id_to_lock_key(batch_id) do
+      key when is_integer(key) ->
+        Ecto.Adapters.SQL.query!(repo, "SELECT pg_advisory_xact_lock($1::bigint)", [key])
+
+      {:error, reason} ->
+        raise "GoodJob.AdvisoryLock: could not hash batch id for advisory lock: #{inspect(reason)}"
+    end
+  end
+
   defp transaction_lock_function(opts) do
     function =
       opts[:function] ||

@@ -3,12 +3,11 @@ defmodule GoodJob.Protocol.Notification do
   Notification formatting for cross-language GoodJob communication.
 
   This module handles formatting notifications that are sent via PostgreSQL
-  LISTEN/NOTIFY to match Ruby GoodJob's notification format, enabling
-  cross-language job dispatch coordination.
+  LISTEN/NOTIFY for cross-language job dispatch coordination.
 
   ## Notification Format
 
-  Notifications follow Ruby GoodJob's format:
+  Notifications use the shared GoodJob wire format:
 
       %{
         "queue_name" => "default",
@@ -23,7 +22,7 @@ defmodule GoodJob.Protocol.Notification do
   """
 
   @doc """
-  Creates a notification message for a job in Ruby GoodJob format.
+  Creates a notification message for a job in the standard GoodJob wire format.
 
   Returns a map with `queue_name` and optionally `scheduled_at` (ISO8601 format).
 

@@ -223,7 +223,7 @@ defmodule GoodJob.Protocol.Deserializer do
 
   defp resolve_job_module_protocol(job_class_string) do
     # Protocol fallbacks (for external jobs not in external_jobs)
-    # Try converting Ruby format to Elixir format
+    # Try converting external class string to Elixir module form
     elixir_module_string = GoodJob.Protocol.Serialization.external_class_to_module(job_class_string)
 
     # Try loading the converted module name

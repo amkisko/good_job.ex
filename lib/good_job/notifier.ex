@@ -2,12 +2,11 @@ defmodule GoodJob.Notifier do
   @moduledoc """
   Handles PostgreSQL LISTEN/NOTIFY for low-latency job dispatch.
 
-  This module listens on the `good_job` channel (matching Ruby GoodJob's CHANNEL constant)
-  and notifies schedulers when new jobs are available.
+  This module listens on the `good_job` channel and notifies schedulers when new jobs are available.
 
   The channel name defaults to `"good_job"` and can be configured via `:notifier_channel`
-  in GoodJob configuration. This must match the channel used by Ruby GoodJob for
-  cross-language compatibility.
+  in GoodJob configuration. Use the same channel name everywhere workers and enqueue
+  clients connect so NOTIFY reaches the right listeners.
 
   Uses `Postgrex.SimpleConnection` for connection management.
   """

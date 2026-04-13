@@ -3,8 +3,8 @@ defmodule GoodJob.Protocol.Serialization do
   Low-level serialization compatibility layer for ActiveJob format.
 
   This module handles conversion between ActiveJob's serialization format
-  (used by Ruby GoodJob) and our internal format, enabling cross-language
-  job execution. This is part of the GoodJob/ActiveJob protocol implementation.
+  and our internal format, enabling cross-language job execution. This is
+  part of the GoodJob/ActiveJob protocol implementation.
 
   ## ActiveJob Serialization Format
 

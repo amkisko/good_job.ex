@@ -97,7 +97,7 @@ defmodule GoodJob.Poller do
     should_poll =
       case message do
         %{"queue_name" => queue_name} ->
-          # Ruby GoodJob format: { queue_name: "...", scheduled_at: "..." }
+          # Standard payload: %{ "queue_name" => ..., "scheduled_at" => ... }
           # Only trigger poll if this queue matches our configuration
           queue_matches?(queue_name, state.parsed_queues)
 

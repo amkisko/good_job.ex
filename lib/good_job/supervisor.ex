@@ -178,6 +178,7 @@ defmodule GoodJob.Supervisor do
         | Enum.map(GoodJob.Config.plugins(), &plugin_child_spec(&1, config))
       ]
       |> Enum.filter(&(&1 != nil))
+      |> maybe_idle_shutdown()
 
     Supervisor.init(children, strategy: :one_for_one)
   end
@@ -198,5 +199,12 @@ defmodule GoodJob.Supervisor do
 
   defp plugin_child_spec(module, conf) when is_atom(module) do
     plugin_child_spec({module, []}, conf)
+  end
+
+  defp maybe_idle_shutdown(children) do
+    case GoodJob.Config.idle_timeout() do
+      nil -> children
+      _ -> children ++ [{GoodJob.IdleShutdown, []}]
+    end
   end
 end

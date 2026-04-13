@@ -3,8 +3,9 @@ defmodule GoodJob.Config.Validation do
   Configuration validation logic.
   """
 
-  # Valid execution modes (aligned with Ruby GoodJob)
+  # Valid execution modes
   @valid_execution_modes [:external, :async, :inline]
+  @valid_lock_strategies [:advisory, :skiplocked, :hybrid]
   @valid_advisory_lock_functions ~w(
     pg_try_advisory_xact_lock
     pg_advisory_xact_lock
@@ -41,6 +42,8 @@ defmodule GoodJob.Config.Validation do
     validate_notifier_config!(config)
     validate_advisory_lock_config!(config)
     validate_external_jobs!(config)
+    validate_lock_strategy!(config)
+    validate_idle_timeout!(config)
 
     config
   end
@@ -51,6 +54,24 @@ defmodule GoodJob.Config.Validation do
     if max_count && (not is_integer(max_count) or max_count < 1) do
       raise ArgumentError,
             "GoodJob cleanup_preserved_jobs_max_count must be a positive integer or nil. Got: #{inspect(max_count)}"
+    end
+  end
+
+  defp validate_lock_strategy!(config) do
+    strategy = config[:lock_strategy]
+
+    if strategy && strategy not in @valid_lock_strategies do
+      raise ArgumentError,
+            "GoodJob lock_strategy must be one of #{inspect(@valid_lock_strategies)}. Got: #{inspect(strategy)}"
+    end
+  end
+
+  defp validate_idle_timeout!(config) do
+    idle = config[:idle_timeout]
+
+    if idle && (not is_integer(idle) or idle < 1) do
+      raise ArgumentError,
+            "GoodJob idle_timeout must be a positive integer (seconds) or nil. Got: #{inspect(idle)}"
     end
   end
 

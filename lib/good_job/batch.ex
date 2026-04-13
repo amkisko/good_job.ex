@@ -5,7 +5,7 @@ defmodule GoodJob.Batch do
   Batches allow you to group jobs together and execute callbacks when all jobs complete.
   """
 
-  alias GoodJob.{Batch, BatchRecord, Job, Repo}
+  alias GoodJob.{AdvisoryLock, Batch, BatchRecord, Job, ModuleResolver, Repo}
 
   @doc """
   Creates a new batch and enqueues jobs within it.
@@ -28,6 +28,7 @@ defmodule GoodJob.Batch do
   """
   defstruct [
     :description,
+    :properties,
     :on_finish,
     :on_success,
     :on_discard,
@@ -39,6 +40,7 @@ defmodule GoodJob.Batch do
   def new(opts \\ []) do
     %__MODULE__{
       description: Keyword.get(opts, :description),
+      properties: Keyword.get(opts, :properties, %{}),
       on_finish: Keyword.get(opts, :on_finish),
       on_success: Keyword.get(opts, :on_success),
       on_discard: Keyword.get(opts, :on_discard),
@@ -65,19 +67,48 @@ defmodule GoodJob.Batch do
   Enqueues all jobs in the batch.
   """
   def enqueue(%Batch{} = batch) do
-    _repo = Repo.repo()
-
-    # Create batch record
     batch_record = create_batch_record(batch)
 
-    # Enqueue all jobs with batch_id
-    Enum.each(batch.jobs, fn job ->
-      GoodJob.enqueue(job.module, job.args, Keyword.merge(job.opts, batch_id: batch_record.id))
-    end)
+    if batch.jobs == [] do
+      _ = check_completion(batch_record.id, nil)
+    else
+      Enum.each(batch.jobs, fn job ->
+        GoodJob.enqueue(job.module, job.args, Keyword.merge(job.opts, batch_id: batch_record.id))
+      end)
+    end
 
     GoodJob.Telemetry.batch_enqueue(batch_record, length(batch.jobs))
 
     {:ok, batch_record}
+  end
+
+  @doc """
+  Like `enqueue/1`, but enqueues all member jobs in a single `GoodJob.Bulk` flush so PostgreSQL
+  `LISTEN/NOTIFY` runs once for the whole batch instead of once per job insert.
+  """
+  def enqueue_all(%Batch{} = batch) do
+    batch_record = create_batch_record(batch)
+
+    if batch.jobs == [] do
+      _ = check_completion(batch_record.id, nil)
+      GoodJob.Telemetry.batch_enqueue(batch_record, 0)
+      {:ok, batch_record}
+    else
+      {:ok, _jobs} =
+        GoodJob.Bulk.enqueue(fn ->
+          Enum.each(batch.jobs, fn job ->
+            GoodJob.enqueue(
+              job.module,
+              job.args,
+              Keyword.merge(job.opts, batch_id: batch_record.id)
+            )
+          end)
+        end)
+
+      GoodJob.Telemetry.batch_enqueue(batch_record, length(batch.jobs))
+
+      {:ok, batch_record}
+    end
   end
 
   defp create_batch_record(batch) do
@@ -85,7 +116,7 @@ defmodule GoodJob.Batch do
 
     attrs = %{
       description: batch.description,
-      serialized_properties: %{},
+      serialized_properties: batch.properties || %{},
       on_finish: serialize_callback(batch.on_finish),
       on_success: serialize_callback(batch.on_success),
       on_discard: serialize_callback(batch.on_discard),
@@ -106,6 +137,8 @@ defmodule GoodJob.Batch do
     repo = Repo.repo()
 
     repo.transaction(fn ->
+      AdvisoryLock.lock_batch_record_tx!(repo, batch_id)
+
       case repo.get(BatchRecord, batch_id) do
         nil ->
           :ok
@@ -212,10 +245,9 @@ defmodule GoodJob.Batch do
   end
 
   defp execute_callback(callback_string, batch, event, queue, priority) when is_binary(callback_string) do
-    case Code.ensure_loaded(String.to_existing_atom(callback_string)) do
-      {:module, callback_module} ->
+    case ModuleResolver.resolve(callback_string) do
+      {:ok, callback_module} ->
         if function_exported?(callback_module, :perform, 1) do
-          # Enqueue callback job
           GoodJob.enqueue(callback_module, %{batch: batch, event: event},
             queue: queue,
             priority: priority,
@@ -225,7 +257,7 @@ defmodule GoodJob.Batch do
           GoodJob.Telemetry.batch_callback(batch, event, callback_string)
         end
 
-      _ ->
+      {:error, _} ->
         :ok
     end
   end

@@ -263,6 +263,19 @@ defmodule GoodJob.ConfigTest do
     end
   end
 
+  describe "lock_strategy/0" do
+    test "returns a valid strategy atom" do
+      assert Config.lock_strategy() in [:advisory, :skiplocked, :hybrid]
+    end
+  end
+
+  describe "idle_timeout/0" do
+    test "returns nil or positive integer" do
+      t = Config.idle_timeout()
+      assert is_nil(t) or (is_integer(t) and t >= 1)
+    end
+  end
+
   describe "external_jobs/0" do
     test "returns empty map by default" do
       external_jobs = Config.external_jobs()

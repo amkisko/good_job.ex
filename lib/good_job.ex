@@ -52,8 +52,19 @@ defmodule GoodJob do
 
       # Execute inline (synchronously)
       GoodJob.enqueue(MyApp.MyJob, %{data: "hello"}, execution_mode: :inline)
+
+      # Bulk enqueue (single NOTIFY): used by `GoodJob.Batch.enqueue_all/1`
+      GoodJob.enqueue(MyApp.MyJob, %{data: "hello"}, batch_id: batch_id, listen_notify: false)
   """
   def enqueue(job_module, args, opts \\ []) do
+    case prepare_enqueue(job_module, args, opts) do
+      {:ok, prepared} -> commit_enqueue(prepared)
+      {:error, _} = err -> err
+    end
+  end
+
+  @doc false
+  def prepare_enqueue(job_module, args, opts \\ []) do
     execution_mode = Keyword.get(opts, :execution_mode, :async)
 
     {callback_module, job_class_string, external_job_class} = normalize_job_identifier(job_module)
@@ -63,10 +74,10 @@ defmodule GoodJob do
     priority = Keyword.get(opts, :priority) || get_default_priority(callback_module)
     scheduled_at = Keyword.get(opts, :scheduled_at)
     batch_id = Keyword.get(opts, :batch_id)
+    batch_callback_id = Keyword.get(opts, :batch_callback_id)
     concurrency_key = Keyword.get(opts, :concurrency_key)
     tags = Keyword.get(opts, :tags, get_default_tags(callback_module))
 
-    # Check concurrency limits if configured
     concurrency_result =
       if concurrency_key do
         config = get_concurrency_config(job_module, opts)
@@ -77,12 +88,10 @@ defmodule GoodJob do
 
     case concurrency_result do
       :ok ->
-        # Execute before_enqueue callback
         case before_enqueue(callback_module, args, opts) do
           {:ok, final_args} ->
             active_job_id = Ecto.UUID.generate()
 
-            # Serialize in ActiveJob format for cross-language compatibility
             serialized_params =
               GoodJob.Protocol.Serialization.to_active_job(
                 job_class: external_job_class,
@@ -104,37 +113,52 @@ defmodule GoodJob do
               scheduled_at: scheduled_at,
               executions_count: 0,
               batch_id: batch_id,
+              batch_callback_id: batch_callback_id,
               concurrency_key: concurrency_key,
               labels: tags
             }
 
-            if execution_mode != :inline and GoodJob.Bulk.buffering?() do
-              GoodJob.Bulk.add(%{
-                job_attrs: job_attrs,
-                callback_module: callback_module,
-                opts: opts
-              })
-            else
-              case GoodJob.Job.enqueue(job_attrs) do
-                {:ok, job} ->
-                  # Telemetry.enqueue is now emitted by Job.enqueue/1
-                  # Execute after_enqueue callback
-                  after_enqueue(callback_module, job, opts)
-
-                  # Execute based on mode (default async just enqueues).
-                  GoodJob.ExecutionMode.execute(job, execution_mode, opts)
-
-                error ->
-                  error
-              end
-            end
+            {:ok,
+             %{
+               job_attrs: job_attrs,
+               callback_module: callback_module,
+               opts: opts,
+               execution_mode: execution_mode
+             }}
 
           {:error, reason} ->
             {:error, reason}
         end
 
-      {:error, _reason} = error ->
+      {:error, _} = error ->
         error
+    end
+  end
+
+  @doc false
+  def commit_enqueue(%{
+        job_attrs: job_attrs,
+        callback_module: callback_module,
+        opts: opts,
+        execution_mode: execution_mode
+      }) do
+    listen_notify? = Keyword.get(opts, :listen_notify, true)
+
+    if execution_mode != :inline and GoodJob.Bulk.buffering?() do
+      GoodJob.Bulk.add(%{
+        job_attrs: job_attrs,
+        callback_module: callback_module,
+        opts: opts
+      })
+    else
+      case GoodJob.Job.enqueue(job_attrs, listen_notify: listen_notify?) do
+        {:ok, job} ->
+          after_enqueue(callback_module, job, opts)
+          GoodJob.ExecutionMode.execute(job, execution_mode, opts)
+
+        error ->
+          error
+      end
     end
   end
 

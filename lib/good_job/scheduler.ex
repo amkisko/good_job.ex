@@ -108,6 +108,8 @@ defmodule GoodJob.Scheduler do
             {:noreply, state}
 
           {:ok, job} ->
+            GoodJob.IdleTracker.touch_execution()
+
             task =
               Task.Supervisor.async_nolink(state.task_supervisor, fn ->
                 case GoodJob.JobExecutor.execute(job, state.lock_id) do

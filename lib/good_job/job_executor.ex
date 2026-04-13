@@ -236,6 +236,10 @@ defmodule GoodJob.JobExecutor do
         GoodJob.Batch.check_completion(fresh_job.batch_id, fresh_job)
       end
 
+      if fresh_job.batch_callback_id do
+        GoodJob.Batch.check_completion(fresh_job.batch_callback_id, fresh_job)
+      end
+
       if handled_error || unhandled_error do
         Telemetry.execute_error(fresh_job, handled_error || unhandled_error, start_time)
       else

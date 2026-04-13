@@ -12,6 +12,22 @@ defmodule GoodJob.Config.ValidationTest do
   }
 
   describe "validate!/1" do
+    test "raises error when lock_strategy is invalid" do
+      config = Map.put(@base_config, :lock_strategy, :not_a_strategy)
+
+      assert_raise ArgumentError, ~r/lock_strategy must be one of/, fn ->
+        Validation.validate!(config)
+      end
+    end
+
+    test "raises error when idle_timeout is invalid" do
+      config = Map.put(@base_config, :idle_timeout, 0)
+
+      assert_raise ArgumentError, ~r/idle_timeout must be a positive integer/, fn ->
+        Validation.validate!(config)
+      end
+    end
+
     test "raises error when repo is missing" do
       config = Map.delete(@base_config, :repo)
 

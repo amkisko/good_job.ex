@@ -5,10 +5,10 @@ defmodule GoodJob.Backoff do
   This module calculates the delay (in seconds) before retrying a failed job.
   It does NOT handle retry logic itself - that's handled by the job retry/discard system.
 
-  Aligned with Ruby GoodJob's ActiveJob retry behavior:
-  - Default: Constant 3 seconds (matches Ruby GoodJob's `retry_on` default)
+  Follows ActiveJob-style retry timing (as used by GoodJob):
+  - Default: constant 3 seconds (`retry_on`-style default wait)
   - Supports exponential, linear, constant, and polynomial backoff
-  - Default jitter: 15% (0.15) to match Ruby GoodJob's ActiveJob default
+  - Default jitter: 15% (0.15), matching ActiveJob defaults
 
   ## How It Works
 
@@ -21,7 +21,7 @@ defmodule GoodJob.Backoff do
   whether a job should be retried at all.
   """
 
-  # Default values aligned with Ruby GoodJob/ActiveJob
+  # Default values follow ActiveJob-style retry conventions
   @default_mult 2.0
   @default_base 1
   @default_constant_base 3
@@ -61,7 +61,7 @@ defmodule GoodJob.Backoff do
   @doc """
   Calculates constant backoff.
 
-  This is the default strategy for Ruby GoodJob (ActiveJob's `retry_on` default wait: 3 seconds).
+  This is the default strategy (ActiveJob `retry_on` default wait: 3 seconds).
 
   ## Examples
 
@@ -104,11 +104,11 @@ defmodule GoodJob.Backoff do
   end
 
   @doc """
-  Calculates polynomial backoff (matches Ruby ActiveJob's `:polynomially_longer`).
+  Calculates polynomial backoff (ActiveJob `:polynomially_longer`).
 
   Formula: `((executions^4) + (rand * executions^4 * jitter)) + 2`
 
-  This matches Ruby ActiveJob's polynomial backoff strategy.
+  Same shape as ActiveJob's polynomial backoff strategy.
 
   ## Examples
 
@@ -141,8 +141,8 @@ defmodule GoodJob.Backoff do
   @doc """
   Adds jitter to a delay value.
 
-  Uses additive-only jitter calculation (rand * delay * jitter), matching Ruby GoodJob's behavior.
-  Default jitter is 15% (0.15) to match Ruby ActiveJob's default.
+  Uses additive-only jitter (`rand * delay * jitter`).
+  Default jitter is 15% (0.15), matching ActiveJob defaults.
 
   ## Examples
 
@@ -156,7 +156,7 @@ defmodule GoodJob.Backoff do
 
     # Avoid calling :rand.uniform(0) which is invalid
     if jitter_amount > 0 do
-      # Additive-only jitter (rand * delay * jitter) - matches Ruby Kernel.rand * delay * jitter
+      # Additive-only jitter (rand * delay * jitter)
       random_jitter = :rand.uniform(jitter_amount)
       max(1, delay + random_jitter)
     else

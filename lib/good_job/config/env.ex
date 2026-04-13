@@ -38,7 +38,18 @@ defmodule GoodJob.Config.Env do
     |> maybe_put(:advisory_lock_heartbeat, System.get_env("GOOD_JOB_ADVISORY_LOCK_HEARTBEAT"))
     |> maybe_put(:advisory_lock_function, System.get_env("GOOD_JOB_ADVISORY_LOCK_FUNCTION"))
     |> maybe_put(:advisory_lock_hash_algorithm, System.get_env("GOOD_JOB_ADVISORY_LOCK_HASH_ALGORITHM"))
+    |> maybe_put(:lock_strategy, System.get_env("GOOD_JOB_LOCK_STRATEGY"))
+    |> maybe_put(:idle_timeout, System.get_env("GOOD_JOB_IDLE_TIMEOUT"))
     |> maybe_put(:cron, parse_cron_env())
+  end
+
+  defp parse_lock_strategy(value) when is_binary(value) do
+    case String.downcase(String.trim(value)) do
+      "advisory" -> :advisory
+      "skiplocked" -> :skiplocked
+      "hybrid" -> :hybrid
+      other -> raise ArgumentError, "Invalid GOOD_JOB_LOCK_STRATEGY: #{inspect(other)}"
+    end
   end
 
   defp parse_cron_env do
@@ -115,6 +126,12 @@ defmodule GoodJob.Config.Env do
 
       :advisory_lock_heartbeat ->
         Map.put(config, key, value in ["true", "1", "yes"])
+
+      :lock_strategy ->
+        Map.put(config, key, parse_lock_strategy(value))
+
+      :idle_timeout ->
+        Map.put(config, key, String.to_integer(value))
 
       _ ->
         Map.put(config, key, value)

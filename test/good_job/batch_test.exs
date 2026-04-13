@@ -1,6 +1,8 @@
 defmodule GoodJob.BatchTest do
   use ExUnit.Case, async: false
 
+  import Ecto.Query
+
   alias GoodJob.{Batch, Repo}
 
   defmodule TestJob do
@@ -31,10 +33,30 @@ defmodule GoodJob.BatchTest do
     :ok
   end
 
+  # Callback jobs use `batch_callback_id`; the batch row gets `finished_at` only after they finish.
+  defp finish_pending_callbacks_and_complete_batch!(batch_id) do
+    repo = Repo.repo()
+
+    pending =
+      repo.all(
+        from(j in GoodJob.Job,
+          where: j.batch_callback_id == ^batch_id,
+          where: is_nil(j.finished_at)
+        )
+      )
+
+    Enum.each(pending, fn j ->
+      repo.update!(GoodJob.Job.changeset(j, %{finished_at: DateTime.utc_now(), error: nil}))
+    end)
+
+    Batch.check_completion(batch_id)
+  end
+
   describe "new/1" do
     test "creates new batch with defaults" do
       batch = Batch.new()
       assert batch.jobs == []
+      assert batch.properties == %{}
       assert batch.callback_queue_name == "default"
       assert batch.callback_priority == 0
     end
@@ -109,6 +131,41 @@ defmodule GoodJob.BatchTest do
       batch = Batch.add_job(batch, TestJob, %{data: "3"})
       assert {:ok, batch_record} = Batch.enqueue(batch)
       assert batch_record.id != nil
+    end
+
+    test "enqueue_all/1 persists batch and member jobs like enqueue/1" do
+      Ecto.Adapters.SQL.Sandbox.checkout(Repo.repo())
+
+      batch =
+        Batch.new()
+        |> Batch.add_job(TestJob, %{data: "a"})
+        |> Batch.add_job(TestJob, %{data: "b"})
+
+      assert {:ok, batch_record} = Batch.enqueue_all(batch)
+      repo = Repo.repo()
+      assert repo.aggregate(GoodJob.Job.with_batch_id(batch_record.id), :count, :id) == 2
+    end
+
+    test "empty batch without callbacks marks batch finished" do
+      Ecto.Adapters.SQL.Sandbox.checkout(Repo.repo())
+      assert {:ok, batch_record} = Batch.enqueue(Batch.new())
+      repo = Repo.repo()
+      br = repo.get!(GoodJob.BatchRecord, batch_record.id)
+      assert not is_nil(br.finished_at)
+    end
+
+    test "persists batch properties to serialized_properties" do
+      Ecto.Adapters.SQL.Sandbox.checkout(Repo.repo())
+
+      batch =
+        Batch.new(properties: %{"kind" => "import", :source => "api"})
+        |> Batch.add_job(TestJob, %{})
+
+      assert {:ok, batch_record} = Batch.enqueue(batch)
+      assert batch_record.serialized_properties["kind"] == "import"
+
+      assert batch_record.serialized_properties[:source] == "api" ||
+               batch_record.serialized_properties["source"] == "api"
     end
   end
 
@@ -217,17 +274,12 @@ defmodule GoodJob.BatchTest do
         )
       end
 
+      job = job && repo.get!(GoodJob.Job, job.id)
+
       # Check completion - should execute on_discard callback
-      result = Batch.check_completion(batch_record.id)
+      result = Batch.check_completion(batch_record.id, job)
       assert {:ok, _} = result
 
-      # Verify callback was executed by checking that batch completion succeeded
-      # The callback job enqueueing happens inside a transaction, so we verify
-      # the batch was marked as finished (which only happens if callbacks executed)
-      updated_batch = repo.get!(GoodJob.BatchRecord, batch_record.id)
-      assert not is_nil(updated_batch.finished_at)
-
-      # Verify callback job was enqueued (query all jobs to find callback)
       all_jobs = repo.all(GoodJob.Job)
 
       callback_job =
@@ -236,11 +288,15 @@ defmodule GoodJob.BatchTest do
             (j.batch_callback_id == batch_record.id || j.batch_id == batch_record.id)
         end)
 
-      # Callback job should exist (if not found, the callback execution path was still tested)
       if callback_job do
         assert callback_job.queue_name == "callback_queue"
         assert callback_job.priority == 10
       end
+
+      assert {:ok, _} = finish_pending_callbacks_and_complete_batch!(batch_record.id)
+
+      updated_batch = repo.get!(GoodJob.BatchRecord, batch_record.id)
+      assert not is_nil(updated_batch.finished_at)
     end
 
     test "executes on_success callback when no jobs are discarded" do
@@ -268,11 +324,6 @@ defmodule GoodJob.BatchTest do
       result = Batch.check_completion(batch_record.id)
       assert {:ok, _} = result
 
-      # Verify callback was executed by checking batch was finished
-      updated_batch = repo.get!(GoodJob.BatchRecord, batch_record.id)
-      assert not is_nil(updated_batch.finished_at)
-
-      # Verify callback job was enqueued
       all_jobs = repo.all(GoodJob.Job)
 
       callback_job =
@@ -285,6 +336,11 @@ defmodule GoodJob.BatchTest do
         assert callback_job.queue_name == "success_queue"
         assert callback_job.priority == 5
       end
+
+      assert {:ok, _} = finish_pending_callbacks_and_complete_batch!(batch_record.id)
+
+      updated_batch = repo.get!(GoodJob.BatchRecord, batch_record.id)
+      assert not is_nil(updated_batch.finished_at)
     end
 
     test "executes on_finish callback when batch completes" do
@@ -312,11 +368,6 @@ defmodule GoodJob.BatchTest do
       result = Batch.check_completion(batch_record.id)
       assert {:ok, _} = result
 
-      # Verify callback was executed by checking batch was finished
-      updated_batch = repo.get!(GoodJob.BatchRecord, batch_record.id)
-      assert not is_nil(updated_batch.finished_at)
-
-      # Verify callback job was enqueued
       all_jobs = repo.all(GoodJob.Job)
 
       callback_job =
@@ -329,6 +380,11 @@ defmodule GoodJob.BatchTest do
         assert callback_job.queue_name == "finish_queue"
         assert callback_job.priority == 3
       end
+
+      assert {:ok, _} = finish_pending_callbacks_and_complete_batch!(batch_record.id)
+
+      updated_batch = repo.get!(GoodJob.BatchRecord, batch_record.id)
+      assert not is_nil(updated_batch.finished_at)
     end
 
     test "executes all callbacks when batch completes with discarded jobs" do
@@ -358,15 +414,12 @@ defmodule GoodJob.BatchTest do
         )
       end
 
+      job = job && repo.get!(GoodJob.Job, job.id)
+
       # Check completion - should execute on_discard and on_finish callbacks
-      result = Batch.check_completion(batch_record.id)
+      result = Batch.check_completion(batch_record.id, job)
       assert {:ok, _} = result
 
-      # Verify callbacks were executed by checking batch was finished
-      updated_batch = repo.get!(GoodJob.BatchRecord, batch_record.id)
-      assert not is_nil(updated_batch.finished_at)
-
-      # Verify callback jobs were enqueued
       all_jobs = repo.all(GoodJob.Job)
 
       callback_count =
@@ -375,9 +428,12 @@ defmodule GoodJob.BatchTest do
             (j.batch_callback_id == batch_record.id || j.batch_id == batch_record.id)
         end)
 
-      # Should have at least 2 callback jobs (on_discard and on_finish)
-      # Note: If callbacks aren't found, the execution paths were still tested
-      assert callback_count >= 0
+      assert callback_count >= 2
+
+      assert {:ok, _} = finish_pending_callbacks_and_complete_batch!(batch_record.id)
+
+      updated_batch = repo.get!(GoodJob.BatchRecord, batch_record.id)
+      assert not is_nil(updated_batch.finished_at)
     end
 
     test "executes all callbacks when batch completes successfully" do
@@ -406,11 +462,6 @@ defmodule GoodJob.BatchTest do
       result = Batch.check_completion(batch_record.id)
       assert {:ok, _} = result
 
-      # Verify callbacks were executed by checking batch was finished
-      updated_batch = repo.get!(GoodJob.BatchRecord, batch_record.id)
-      assert not is_nil(updated_batch.finished_at)
-
-      # Verify callback jobs were enqueued
       all_jobs = repo.all(GoodJob.Job)
 
       callback_count =
@@ -419,9 +470,12 @@ defmodule GoodJob.BatchTest do
             (j.batch_callback_id == batch_record.id || j.batch_id == batch_record.id)
         end)
 
-      # Should have at least 2 callback jobs (on_success and on_finish)
-      # Note: If callbacks aren't found, the execution paths were still tested
-      assert callback_count >= 0
+      assert callback_count >= 2
+
+      assert {:ok, _} = finish_pending_callbacks_and_complete_batch!(batch_record.id)
+
+      updated_batch = repo.get!(GoodJob.BatchRecord, batch_record.id)
+      assert not is_nil(updated_batch.finished_at)
     end
 
     test "handles callback module without perform/1 function" do
@@ -482,11 +536,6 @@ defmodule GoodJob.BatchTest do
       result = Batch.check_completion(batch_record.id)
       assert {:ok, _} = result
 
-      # Verify callback was executed by checking batch was finished
-      updated_batch = repo.get!(GoodJob.BatchRecord, batch_record.id)
-      assert not is_nil(updated_batch.finished_at)
-
-      # Verify callback job was enqueued
       all_jobs = repo.all(GoodJob.Job)
 
       callback_job =
@@ -498,6 +547,11 @@ defmodule GoodJob.BatchTest do
       if callback_job do
         assert callback_job.queue_name == "string_callback"
       end
+
+      assert {:ok, _} = finish_pending_callbacks_and_complete_batch!(batch_record.id)
+
+      updated_batch = repo.get!(GoodJob.BatchRecord, batch_record.id)
+      assert not is_nil(updated_batch.finished_at)
     end
   end
 

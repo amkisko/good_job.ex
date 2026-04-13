@@ -33,7 +33,9 @@ defmodule GoodJob.Config.Defaults do
     advisory_lock_heartbeat: false,
     advisory_lock_function: :pg_try_advisory_xact_lock,
     advisory_lock_hash_algorithm: :md5,
-    external_jobs: %{}
+    external_jobs: %{},
+    lock_strategy: :advisory,
+    idle_timeout: nil
   }
 
   @doc """

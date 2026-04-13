@@ -46,6 +46,8 @@ defmodule GoodJob.Config do
     * `:external_jobs` - Map of external job class names (strings) to Elixir modules (atoms) for cross-language job resolution (default: `%{}`)
       Only needed for jobs enqueued from external languages (e.g., Ruby Rails, Zig). Elixir-native jobs are automatically resolved by module name at runtime.
       Example: `%{"ElixirProcessedJob" => MyApp.Jobs.ProcessJob}`
+    * `:lock_strategy` - Job dequeue locking: `:advisory` (default), `:skiplocked`, or `:hybrid`. Environment: `GOOD_JOB_LOCK_STRATEGY`
+    * `:idle_timeout` - When set (positive integer seconds), stops `GoodJob.Supervisor` after no job execution and no running workers for this duration. Default: `nil` (disabled). Environment: `GOOD_JOB_IDLE_TIMEOUT`
   """
 
   alias GoodJob.Config.{Defaults, Env, Validation}
@@ -86,7 +88,9 @@ defmodule GoodJob.Config do
           advisory_lock_heartbeat: boolean(),
           advisory_lock_function: atom() | String.t(),
           advisory_lock_hash_algorithm: atom() | String.t(),
-          external_jobs: map()
+          external_jobs: map(),
+          lock_strategy: :advisory | :skiplocked | :hybrid,
+          idle_timeout: pos_integer() | nil
         }
 
   @doc """
@@ -546,5 +550,24 @@ defmodule GoodJob.Config do
   """
   def external_jobs do
     get(:external_jobs, Defaults.get(:external_jobs))
+  end
+
+  @doc """
+  Returns the dequeue lock strategy (`:advisory`, `:skiplocked`, or `:hybrid`).
+
+  Same setting as `GOOD_JOB_LOCK_STRATEGY` / `config.good_job.lock_strategy` in the reference GoodJob implementation.
+  """
+  def lock_strategy do
+    get(:lock_strategy, Defaults.get(:lock_strategy))
+  end
+
+  @doc """
+  Returns idle shutdown timeout in seconds, or `nil` to disable.
+
+  When set, `GoodJob.IdleShutdown` stops the supervision tree after this many seconds
+  with no job execution and no in-flight worker tasks. Environment: `GOOD_JOB_IDLE_TIMEOUT`.
+  """
+  def idle_timeout do
+    get(:idle_timeout, Defaults.get(:idle_timeout))
   end
 end

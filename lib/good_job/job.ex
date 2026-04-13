@@ -38,6 +38,7 @@ defmodule GoodJob.Job do
     field(:labels, {:array, :string})
     field(:locked_by_id, :binary_id)
     field(:locked_at, :utc_datetime_usec)
+    field(:lock_type, :integer)
 
     field(:inserted_at, :utc_datetime_usec, source: :created_at, autogenerate: {DateTime, :utc_now, []})
     field(:updated_at, :utc_datetime_usec, autogenerate: {DateTime, :utc_now, []})
@@ -130,7 +131,8 @@ defmodule GoodJob.Job do
       :error_event,
       :labels,
       :locked_by_id,
-      :locked_at
+      :locked_at,
+      :lock_type
     ])
     |> validate_required([:active_job_id])
   end
@@ -412,7 +414,7 @@ defmodule GoodJob.Job do
       end
 
       def backoff(attempt) do
-        # Default to constant 3 seconds to match Ruby GoodJob's ActiveJob default
+        # Default to constant 3 seconds (ActiveJob `retry_on` default wait)
         GoodJob.Backoff.constant(attempt)
       end
 
