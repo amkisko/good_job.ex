@@ -40,6 +40,7 @@ defmodule GoodJob.Config.Env do
     |> maybe_put(:advisory_lock_hash_algorithm, System.get_env("GOOD_JOB_ADVISORY_LOCK_HASH_ALGORITHM"))
     |> maybe_put(:lock_strategy, System.get_env("GOOD_JOB_LOCK_STRATEGY"))
     |> maybe_put(:idle_timeout, System.get_env("GOOD_JOB_IDLE_TIMEOUT"))
+    |> maybe_put(:stale_lock_release_after_seconds, System.get_env("GOOD_JOB_STALE_LOCK_RELEASE_AFTER_SECONDS"))
     |> maybe_put(:cron, parse_cron_env())
   end
 
@@ -131,6 +132,9 @@ defmodule GoodJob.Config.Env do
         Map.put(config, key, parse_lock_strategy(value))
 
       :idle_timeout ->
+        Map.put(config, key, String.to_integer(value))
+
+      :stale_lock_release_after_seconds ->
         Map.put(config, key, String.to_integer(value))
 
       _ ->

@@ -48,6 +48,7 @@ defmodule GoodJob.Config do
       Example: `%{"ElixirProcessedJob" => MyApp.Jobs.ProcessJob}`
     * `:lock_strategy` - Job dequeue locking: `:advisory` (default), `:skiplocked`, or `:hybrid`. Environment: `GOOD_JOB_LOCK_STRATEGY`
     * `:idle_timeout` - When set (positive integer seconds), stops `GoodJob.Supervisor` after no job execution and no running workers for this duration. Default: `nil` (disabled). Environment: `GOOD_JOB_IDLE_TIMEOUT`
+    * `:stale_lock_release_after_seconds` - How stale a row lock must be before the periodic sweep clears `locked_by_id` (default: `60`). Increase for jobs that run longer than a minute without updating lock state. Environment: `GOOD_JOB_STALE_LOCK_RELEASE_AFTER_SECONDS`
   """
 
   alias GoodJob.Config.{Defaults, Env, Validation}
@@ -90,7 +91,8 @@ defmodule GoodJob.Config do
           advisory_lock_hash_algorithm: atom() | String.t(),
           external_jobs: map(),
           lock_strategy: :advisory | :skiplocked | :hybrid,
-          idle_timeout: pos_integer() | nil
+          idle_timeout: pos_integer() | nil,
+          stale_lock_release_after_seconds: pos_integer() | nil
         }
 
   @doc """
@@ -435,6 +437,18 @@ defmodule GoodJob.Config do
   """
   def queue_select_limit do
     get(:queue_select_limit, Defaults.get(:queue_select_limit))
+  end
+
+  @doc """
+  Returns how long a row lock may sit unchanged before the stale-lock sweep clears it.
+
+  Defaults to `60` seconds. Jobs that routinely run longer should set this higher.
+  """
+  def stale_lock_release_after_seconds do
+    case get(:stale_lock_release_after_seconds, Defaults.get(:stale_lock_release_after_seconds)) do
+      n when is_integer(n) and n > 0 -> n
+      _ -> Defaults.get(:stale_lock_release_after_seconds)
+    end
   end
 
   @doc """

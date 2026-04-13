@@ -107,7 +107,8 @@ defmodule GoodJob.JobPerformer do
 
     if sweep? do
       now = DateTime.utc_now()
-      stale_lock_cutoff = DateTime.add(now, -60, :second)
+      stale_secs = GoodJob.Config.stale_lock_release_after_seconds()
+      stale_lock_cutoff = DateTime.add(now, -stale_secs, :second)
 
       repo.update_all(
         from(j in Job,

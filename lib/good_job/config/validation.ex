@@ -44,6 +44,7 @@ defmodule GoodJob.Config.Validation do
     validate_external_jobs!(config)
     validate_lock_strategy!(config)
     validate_idle_timeout!(config)
+    validate_stale_lock_release_after_seconds!(config)
 
     config
   end
@@ -72,6 +73,15 @@ defmodule GoodJob.Config.Validation do
     if idle && (not is_integer(idle) or idle < 1) do
       raise ArgumentError,
             "GoodJob idle_timeout must be a positive integer (seconds) or nil. Got: #{inspect(idle)}"
+    end
+  end
+
+  defp validate_stale_lock_release_after_seconds!(config) do
+    secs = config[:stale_lock_release_after_seconds]
+
+    if secs && (not is_integer(secs) or secs < 1) do
+      raise ArgumentError,
+            "GoodJob stale_lock_release_after_seconds must be a positive integer (seconds) or nil. Got: #{inspect(secs)}"
     end
   end
 

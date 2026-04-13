@@ -220,6 +220,16 @@ defmodule GoodJob do
       {:ok, :ok} ->
         :ok
 
+      # Ecto `Repo.transaction/1` (arity 0) wraps callback returns as `{:ok, value}` at the DB
+      # layer, so `lock_failed` from `Concurrency` comes back as `{:ok, {:error, :lock_failed}}` —
+      # not top-level `{:error, :lock_failed}`. Handle those before generic limit errors.
+      {:ok, {:error, :lock_failed}} when attempts > 1 ->
+        Process.sleep(10)
+        enqueue_concurrency_with_retry(concurrency_key, config, attempts - 1)
+
+      {:ok, {:error, :lock_failed}} ->
+        {:error, :lock_failed}
+
       {:ok, {:error, reason}} ->
         {:error, reason}
 

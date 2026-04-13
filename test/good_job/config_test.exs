@@ -276,6 +276,12 @@ defmodule GoodJob.ConfigTest do
     end
   end
 
+  describe "stale_lock_release_after_seconds/0" do
+    test "returns a positive integer" do
+      assert Config.stale_lock_release_after_seconds() == 60
+    end
+  end
+
   describe "external_jobs/0" do
     test "returns empty map by default" do
       external_jobs = Config.external_jobs()

@@ -280,5 +280,14 @@ defmodule GoodJob.Config.EnvTest do
 
       System.delete_env("GOOD_JOB_ADVISORY_LOCK_HASH_ALGORITHM")
     end
+
+    test "merges stale_lock_release_after_seconds from environment" do
+      System.put_env("GOOD_JOB_STALE_LOCK_RELEASE_AFTER_SECONDS", "120")
+
+      config = Env.merge_env_vars(%{})
+      assert config.stale_lock_release_after_seconds == 120
+
+      System.delete_env("GOOD_JOB_STALE_LOCK_RELEASE_AFTER_SECONDS")
+    end
   end
 end

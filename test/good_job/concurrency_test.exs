@@ -148,18 +148,15 @@ defmodule GoodJob.ConcurrencyTest do
     end
   end
 
-  describe "lock failures" do
-    test "returns error when lock acquisition fails" do
-      # Use a key that might cause lock contention
-      config = %{}
-      # Try to get lock twice simultaneously (might fail depending on timing)
-      result1 = Concurrency.check_enqueue_limit("lock-test", config)
-      # Second call might fail if lock is held
-      result2 = Concurrency.check_enqueue_limit("lock-test", config)
-
-      # At least one should succeed, but we're testing the error path
-      assert match?({:ok, _}, result1) or match?({:ok, {:error, :lock_failed}}, result1)
-      assert match?({:ok, _}, result2) or match?({:ok, {:error, :lock_failed}}, result2)
+  describe "lock failures and transaction shape" do
+    test "Repo.transaction/1 wraps {:error, :lock_failed} as {:ok, {:error, :lock_failed}}" do
+      # Ecto arity-0 callback is wrapped as {:ok, callback_result}, so a callback return of
+      # {:error, :lock_failed} becomes {:ok, {:error, :lock_failed}} at the Repo API. GoodJob.enqueue/2
+      # retries lock contention by matching this shape (see enqueue_concurrency_with_retry/3).
+      # Concurrent advisory-lock tests need two real pool connections; SQL Sandbox allowance shares
+      # one connection, so we assert the contract directly.
+      assert Repo.repo().transaction(fn -> {:error, :lock_failed} end) ==
+               {:ok, {:error, :lock_failed}}
     end
   end
 end

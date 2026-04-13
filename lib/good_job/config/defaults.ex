@@ -35,7 +35,8 @@ defmodule GoodJob.Config.Defaults do
     advisory_lock_hash_algorithm: :md5,
     external_jobs: %{},
     lock_strategy: :advisory,
-    idle_timeout: nil
+    idle_timeout: nil,
+    stale_lock_release_after_seconds: 60
   }
 
   @doc """

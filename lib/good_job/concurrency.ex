@@ -13,7 +13,12 @@ defmodule GoodJob.Concurrency do
   @doc """
   Checks if a job can be enqueued based on concurrency limits.
 
-  Returns `:ok` if allowed, `{:error, :limit_exceeded}` or `{:error, :throttle_exceeded}` if not.
+  Returns `{:ok, :ok}` if allowed.
+
+  If the limit or throttle is exceeded, or the advisory lock could not be taken, the result is
+  `{:ok, {:error, reason}}` where `reason` is `:limit_exceeded`, `:throttle_exceeded`, or
+  `:lock_failed`. That shape comes from `Ecto.Repo.transaction/1` wrapping the callback return
+  value (not a rolled-back transaction).
   """
   def check_enqueue_limit(concurrency_key, config) when is_binary(concurrency_key) do
     repo = Repo.repo()
@@ -38,7 +43,10 @@ defmodule GoodJob.Concurrency do
   @doc """
   Checks if a job can be performed based on concurrency limits.
 
-  Returns `:ok` if allowed, `{:error, :limit_exceeded}` or `{:error, :throttle_exceeded}` if not.
+  Returns `{:ok, :ok}` if allowed.
+
+  Otherwise returns `{:ok, {:error, reason}}` with `reason` in `:limit_exceeded`, `:throttle_exceeded`,
+  or `:lock_failed` (see `check_enqueue_limit/2` for why this is `{:ok, {:error, _}}`).
   """
   def check_perform_limit(concurrency_key, job_id, config) when is_binary(concurrency_key) do
     repo = Repo.repo()
