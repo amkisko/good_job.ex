@@ -107,3 +107,5 @@ config :tailwind,
 # Configure StyleCapsule to output to priv/static/assets/css (like Tailwind)
 config :style_capsule,
   output_dir: "priv/static/assets/css"
+
+import_config "#{config_env()}.exs"

@@ -34,7 +34,7 @@ defmodule MonorepoExample.MixProject do
       {:phoenix, "~> 1.8"},
       {:phoenix_live_view, "~> 1.1"},
       {:phoenix_html, "~> 4.3"},
-      {:phoenix_live_reload, "~> 1.2", only: :dev},
+      {:phoenix_live_reload, "~> 1.2", only: [:dev, :test]},
       {:phoenix_live_dashboard, "~> 0.8"},
       {:plug_cowboy, "~> 2.8"},
       # Phlex and StyleCapsule for component-based UI

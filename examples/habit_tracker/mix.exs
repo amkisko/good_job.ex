@@ -35,7 +35,7 @@ defmodule HabitTracker.MixProject do
       {:telemetry_poller, "~> 1.0"},
       {:phoenix_html, "~> 4.3"},
       {:phoenix_html_helpers, "~> 1.0"},
-      {:phoenix_live_reload, "~> 1.4", only: :dev},
+      {:phoenix_live_reload, "~> 1.4", only: [:dev, :test]},
       {:gettext, "~> 0.20"},
       {:jason, "~> 1.4"},
       {:plug_cowboy, "~> 2.8"},

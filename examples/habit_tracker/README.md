@@ -87,6 +87,8 @@ mix ecto.migrate
 mix run priv/repo/seeds.exs
 ```
 
+After upgrading `good_job` or pulling this example, run `mix ecto.migrate` again so `good_jobs` gets a `lock_type` column (required by GoodJob 1.0+). If the database was created from an older migration without that column, the `add_lock_type_to_good_jobs` migration adds it.
+
 4. **Build assets:**
 
 ```bash

@@ -32,6 +32,7 @@ defmodule Elixir.HabitTracker.Repo.Migrations.CreateGoodJobs do
       add :labels, {:array, :text}
       add :locked_by_id, :uuid
       add :locked_at, :utc_datetime_usec
+      add :lock_type, :smallint
     end
 
     # Create good_job_batches table
