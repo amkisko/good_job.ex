@@ -12,10 +12,7 @@ This guide outlines the steps for publishing a new version of good_job to Hex.
 
 Before publishing, ensure:
 
-- [ ] All tests pass (`mix test`)
-- [ ] Code is formatted (`mix format`)
-- [ ] Credo passes (`mix credo --strict`)
-- [ ] Dialyzer passes (`mix dialyzer`)
+- [ ] Full CI-quality run passes (`mix test.ci`: format check, unused lock check, credo, tests, dialyzer), or run those steps individually
 - [ ] CHANGELOG.md is updated
 - [ ] Version is bumped in `mix.exs`
 - [ ] All changes are committed to git

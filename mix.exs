@@ -37,6 +37,9 @@ defmodule GoodJob.MixProject do
         "coveralls.json": :test,
         "coveralls.html": :test,
         "test.all": :test,
+        "test.ci": :test,
+        quality: :test,
+        ci: :test,
         credo: :test,
         dialyzer: :test
       ]
@@ -101,6 +104,7 @@ defmodule GoodJob.MixProject do
       main: "readme",
       source_url: @source_url,
       source_ref: "v#{@version}",
+      skip_undefined_reference_warnings_on: ["CHANGELOG.md"],
       extras: [
         {"README.md", [title: "README", filename: "readme"]},
         "CHANGELOG.md",

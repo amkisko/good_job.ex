@@ -564,7 +564,7 @@ defmodule GoodJob.Config do
   @doc """
   Returns idle shutdown timeout in seconds, or `nil` to disable.
 
-  When set, `GoodJob.IdleShutdown` stops the supervision tree after this many seconds
+  When set, the idle shutdown child stops the supervision tree after this many seconds
   with no job execution and no in-flight worker tasks. Environment: `GOOD_JOB_IDLE_TIMEOUT`.
   """
   def idle_timeout do
