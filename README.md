@@ -305,7 +305,7 @@ See [config/prod.exs.example](config/prod.exs.example) for a complete configurat
 
 - **`stale_lock_release_after_seconds`** (default `60`) and **`GOOD_JOB_STALE_LOCK_RELEASE_AFTER_SECONDS`** control how long a `good_jobs` row may stay locked before the worker’s periodic sweep clears `locked_by_id` / `locked_at` / `performed_at` for rows that look abandoned. Increase this if your jobs routinely run longer than the default window while holding the row lock.
 
-- **`GoodJob.enqueue/3`** with a **`concurrency_key`** runs a concurrency limit check inside `Ecto.Repo.transaction/1`. If another connection holds the per-key advisory lock, the check can return `{:ok, {:error, :lock_failed}}` (Ecto’s arity-0 transaction wrapper). GoodJob retries that case a few times with a short sleep so transient contention does not fail the enqueue immediately.
+- **`GoodJob.enqueue/3`** with a **`concurrency_key`** runs a concurrency limit check inside an Ecto Repo transaction ([`transaction/1` callback](https://hexdocs.pm/ecto/Ecto.Repo.html#c:transaction/1)). If another connection holds the per-key advisory lock, the check can return `{:ok, {:error, :lock_failed}}` (Ecto’s arity-0 transaction wrapper). GoodJob retries that case a few times with a short sleep so transient contention does not fail the enqueue immediately.
 
 ### Advisory Lock Configuration
 

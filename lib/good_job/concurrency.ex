@@ -17,8 +17,8 @@ defmodule GoodJob.Concurrency do
 
   If the limit or throttle is exceeded, or the advisory lock could not be taken, the result is
   `{:ok, {:error, reason}}` where `reason` is `:limit_exceeded`, `:throttle_exceeded`, or
-  `:lock_failed`. That shape comes from `Ecto.Repo.transaction/1` wrapping the callback return
-  value (not a rolled-back transaction).
+  `:lock_failed`. That shape comes from the Repo’s arity-0 transaction callback wrapping the return
+  value (see [Ecto.Repo `transaction/1`](https://hexdocs.pm/ecto/Ecto.Repo.html#c:transaction/1); not a rolled-back transaction).
   """
   def check_enqueue_limit(concurrency_key, config) when is_binary(concurrency_key) do
     repo = Repo.repo()
