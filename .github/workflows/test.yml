@@ -55,7 +55,7 @@ jobs:
           psql "$DATABASE_URL" -c 'CREATE EXTENSION IF NOT EXISTS "uuid-ossp";'
       - run: mix test.setup
       - run: mix coveralls.json
-      - uses: codecov/codecov-action@v5
+      - uses: codecov/codecov-action@v6
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./cover/excoveralls.json
