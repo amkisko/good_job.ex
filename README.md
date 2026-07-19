@@ -3,7 +3,7 @@
 [![Hex Version](https://img.shields.io/hexpm/v/good_job.svg)](https://hex.pm/packages/good_job)
 [![Hex Docs](https://img.shields.io/badge/hex-docs-lightgreen.svg)](https://hexdocs.pm/good_job)
 [![Test Status](https://github.com/amkisko/good_job.ex/actions/workflows/test.yml/badge.svg)](https://github.com/amkisko/good_job.ex/actions/workflows/test.yml)
-[![codecov](https://codecov.io/gh/amkisko/good_job.ex/graph/badge.svg?token=Q0WMBFW7IU)](https://codecov.io/gh/amkisko/good_job.ex)
+[![codecov](https://codecov.io/gh/amkisko/good_job.ex/graph/badge.svg?token=Q0WMBFW7IU)](https://app.codecov.io/github/amkisko/good_job.ex)
 
 Concurrent, Postgres-based job queue backend for Elixir. Provides attribute-based job execution with PostgreSQL advisory locks to ensure run-once safety. Works with Phoenix and can be used standalone in other Elixir frameworks or plain Elixir applications.
 
@@ -398,6 +398,18 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 ## Credits
 
 This Elixir implementation is a port of [GoodJob](https://github.com/bensheldon/good_job) by [Ben Sheldon](https://github.com/bensheldon). We are grateful for the excellent design and implementation of the original Ruby version, which served as the foundation for this port.
+
+## Links
+
+- [GitHub](https://github.com/amkisko/good_job.ex)
+- [GitLab](https://gitlab.com/amkisko/good_job.ex)
+- [Hex](https://hex.pm/packages/good_job)
+- [libraries.io](https://libraries.io/hex/good_job)
+- [Deps.dev](https://deps.dev/hex/good_job)
+- [SonarCloud](https://sonarcloud.io/project/overview?id=amkisko_good_job.ex)
+- [Snyk](https://snyk.io/test/github/amkisko/good_job.ex)
+- [Codecov](https://app.codecov.io/github/amkisko/good_job.ex)
+- [OpenSSF Scorecard](https://scorecard.dev/viewer/?uri=github.com/amkisko/good_job.ex)
 
 ## License
 

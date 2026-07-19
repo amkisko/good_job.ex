@@ -44,3 +44,5 @@ priv/plts/*.plt.hash
 # OS
 .DS_Store
 Thumbs.db
+
+.pray/cache
