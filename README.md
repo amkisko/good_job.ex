@@ -24,7 +24,7 @@ Concurrent, Postgres-based job queue backend for Elixir. Provides attribute-base
 - **Cron Jobs** - Scheduled jobs with cron expressions
 - **Batch Operations** - Batch job tracking and callbacks
 - **Concurrency Controls** - Per-key concurrency limits and throttling
-- **Retry Mechanisms** - Automatic retries with exponential backoff
+- **Retry Mechanisms** - Automatic retries with constant backoff by default (exponential and other strategies available)
 - **Plugins System** - Extensible plugin architecture for custom functionality
 - **Labels/Tags** - Tag jobs for filtering and analytics
 - **Web Dashboard** - Phoenix LiveView dashboard for monitoring and management
@@ -39,7 +39,7 @@ Add `good_job` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:good_job, "~> 0.1.1"}
+    {:good_job, "~> 1.0.0"}
   ]
 end
 ```
@@ -309,7 +309,7 @@ See [config/prod.exs.example](config/prod.exs.example) for a complete configurat
 
 ### Advisory Lock Configuration
 
-- `:advisory_lock_function` controls advisory lock acquisition for transactional lock paths (job claims and concurrency checks). Default: `:pg_try_advisory_xact_lock`.
+- `:advisory_lock_function` controls advisory lock acquisition for transactional lock paths (job claims and concurrency checks). Default: `:pg_try_advisory_xact_lock` (transaction-scoped). Ruby GoodJob commonly uses session-level `pg_try_advisory_lock`; keep the Elixir default unless you have measured a reason to change it on a shared database.
 - `:advisory_lock_hash_algorithm` controls lock-key derivation strategy. Default: `:md5`. Supported: `:md5`, `:sha1`, `:sha224`, `:sha256`, `:sha384`, `:sha512`, `:hashtextextended`, `:hashtext`, `:uuid_v5`.
 - Session-level locks for process heartbeat use `pg_try_advisory_lock`.
 

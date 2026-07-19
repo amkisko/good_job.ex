@@ -132,26 +132,61 @@ defmodule GoodJob.Migrations.CreateGoodJobs do
       name: :index_good_jobs_jobs_on_finished_at_only
     )
 
-    # Note: Ruby GoodJob uses DESC NULLS LAST for priority, ASC for created_at
-    # Ecto doesn't support NULLS LAST in create_index, so we use execute with raw SQL
+    # Legacy Ruby index (DESC priority); candidate lookup uses ASC below.
     execute("""
     CREATE INDEX index_good_jobs_jobs_on_priority_created_at_when_unfinished
     ON good_jobs (priority DESC NULLS LAST, created_at ASC NULLS LAST)
     WHERE finished_at IS NULL
     """)
 
-    # Note: Ruby GoodJob uses ASC NULLS LAST for both columns (candidate lookup)
+    # Ruby GoodJob v4 candidate lookup: smaller priority first
     execute("""
     CREATE INDEX index_good_job_jobs_for_candidate_lookup
     ON good_jobs (priority ASC NULLS LAST, created_at ASC NULLS LAST)
     WHERE finished_at IS NULL
     """)
 
-    # Note: Ruby GoodJob uses ASC NULLS LAST for both columns
     execute("""
     CREATE INDEX index_good_jobs_on_priority_scheduled_at_unfinished_unlocked
     ON good_jobs (priority ASC NULLS LAST, scheduled_at ASC NULLS LAST)
     WHERE finished_at IS NULL AND locked_by_id IS NULL
+    """)
+
+    execute("""
+    CREATE INDEX index_good_jobs_for_candidate_dequeue_unlocked
+    ON good_jobs (priority ASC NULLS LAST, scheduled_at ASC, id ASC)
+    WHERE finished_at IS NULL AND locked_by_id IS NULL
+    """)
+
+    execute("""
+    CREATE INDEX index_good_jobs_on_priority_scheduled_at_unfinished
+    ON good_jobs (priority ASC, scheduled_at ASC, id ASC)
+    WHERE finished_at IS NULL
+    """)
+
+    execute("""
+    CREATE INDEX index_good_jobs_on_queue_name_priority_scheduled_at_unfinished
+    ON good_jobs (queue_name ASC, scheduled_at ASC, id ASC)
+    WHERE finished_at IS NULL
+    """)
+
+    create index(:good_jobs, [:queue_name], name: :index_good_jobs_on_queue_name)
+    create index(:good_jobs, [:created_at], name: :index_good_jobs_on_created_at)
+
+    execute("""
+    CREATE INDEX index_good_jobs_on_discarded
+    ON good_jobs (finished_at DESC)
+    WHERE finished_at IS NOT NULL AND error IS NOT NULL
+    """)
+
+    create index(:good_jobs, [:scheduled_at, :queue_name],
+      name: :index_good_jobs_on_scheduled_at_and_queue_name
+    )
+
+    execute("""
+    CREATE INDEX index_good_jobs_on_unfinished_or_errored
+    ON good_jobs (id)
+    WHERE finished_at IS NULL OR error IS NOT NULL
     """)
 
     create index(:good_jobs, [:batch_id],

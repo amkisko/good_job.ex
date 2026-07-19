@@ -62,11 +62,6 @@ defmodule GoodJob.Job.QueryTest do
       assert %Ecto.Query{} = query
     end
 
-    test "dequeueing_ordered/1 orders jobs for dequeueing" do
-      query = Job.dequeueing_ordered()
-      assert %Ecto.Query{} = query
-    end
-
     test "only_scheduled/1 filters scheduled jobs" do
       query = Job.only_scheduled()
       assert %Ecto.Query{} = query
@@ -127,11 +122,6 @@ defmodule GoodJob.Job.QueryTest do
 
     test "with_all_labels/2 filters by all labels" do
       query = Job.with_all_labels(["important", "billing"])
-      assert %Ecto.Query{} = query
-    end
-
-    test "order_for_candidate_lookup/1 orders jobs" do
-      query = Job.order_for_candidate_lookup()
       assert %Ecto.Query{} = query
     end
 
@@ -365,9 +355,68 @@ defmodule GoodJob.Job.QueryTest do
   end
 
   describe "dequeueing_ordered/1" do
-    test "orders jobs for dequeueing" do
-      query = Job.dequeueing_ordered()
-      assert %Ecto.Query{} = query
+    test "orders by priority ascending nulls last (Ruby GoodJob v4)" do
+      repo = Repo.repo()
+
+      {:ok, low_priority} =
+        Job.enqueue(%{
+          active_job_id: Ecto.UUID.generate(),
+          job_class: "T",
+          queue_name: "default",
+          priority: 10,
+          serialized_params: %{"arguments" => []}
+        })
+
+      {:ok, high_priority} =
+        Job.enqueue(%{
+          active_job_id: Ecto.UUID.generate(),
+          job_class: "T",
+          queue_name: "default",
+          priority: 0,
+          serialized_params: %{"arguments" => []}
+        })
+
+      ordered_ids =
+        Job
+        |> Job.unfinished()
+        |> Job.dequeueing_ordered()
+        |> select([j], j.id)
+        |> repo.all()
+
+      assert ordered_ids == [high_priority.id, low_priority.id]
+    end
+  end
+
+  describe "order_for_candidate_lookup/1" do
+    test "orders by priority ascending nulls last matching claim path" do
+      repo = Repo.repo()
+
+      {:ok, low_priority} =
+        Job.enqueue(%{
+          active_job_id: Ecto.UUID.generate(),
+          job_class: "T",
+          queue_name: "default",
+          priority: 10,
+          serialized_params: %{"arguments" => []}
+        })
+
+      {:ok, high_priority} =
+        Job.enqueue(%{
+          active_job_id: Ecto.UUID.generate(),
+          job_class: "T",
+          queue_name: "default",
+          priority: 0,
+          serialized_params: %{"arguments" => []}
+        })
+
+      ordered_ids =
+        Job
+        |> Job.unfinished()
+        |> Job.order_for_candidate_lookup()
+        |> select([j], j.id)
+        |> repo.all()
+
+      assert ordered_ids == [high_priority.id, low_priority.id]
     end
   end
 

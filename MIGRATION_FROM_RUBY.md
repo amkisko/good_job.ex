@@ -51,7 +51,7 @@ MyApp.MyJob.enqueue(%{data: "hello"})
 Rails.application.configure do
   config.good_job = {
     execution_mode: :external,
-    max_processes: 5,
+    max_threads: 5,
     queues: "*",
     poll_interval: 10
   }
@@ -202,7 +202,7 @@ The database schema is fully compatible. You can use the same migrations and sha
 1. **Install the Elixir package**:
    ```elixir
    # mix.exs
-   {:good_job, "~> 0.1.0"}
+   {:good_job, "~> 1.0.0"}
    ```
 
 2. **Run migrations** (if not already done):

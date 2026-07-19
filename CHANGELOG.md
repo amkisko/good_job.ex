@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## Unreleased
+
+- Fix `Job.dequeueing_ordered/1` to order by priority ascending (smaller first), matching Ruby GoodJob v4 and the claim candidate lookup path.
+- Add migration `add_good_job_parity_indexes` for Ruby GoodJob 4.x indexes missing from older Elixir installs; update the create migration for greenfield installs.
+- Document schema/index honesty, advisory-lock default difference vs Ruby, Hex version pin `~> 1.0.0`, and Ruby `max_threads` in migration examples.
+
 ## 1.0.0
 
 - First stable release, the public API is expected to remain compatible within a given major version.

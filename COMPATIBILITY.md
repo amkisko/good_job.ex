@@ -8,15 +8,13 @@ This allows you to:
 - Process jobs from Elixir/Phoenix in Rails/GoodJob
 - Share the same job queue across both ecosystems
 
-## Database Schema Compatibility ✅
+## Database Schema Compatibility
 
-Both implementations use the **exact same database schema**:
-- `good_jobs` table with identical columns
-- `good_job_processes` table for process tracking
-- `good_job_executions` table for execution history
-- Same indexes and constraints
+Both implementations share the same Protocol tables and columns (`good_jobs`, `good_job_processes`, `good_job_executions`, batches, settings).
 
-No schema changes needed when sharing a database between Ruby and Elixir applications.
+Indexes are intended to match Ruby GoodJob 4.x. Elixir ships an additive migration (`add_good_job_parity_indexes`) for indexes that older Elixir installs may lack. Shared databases that already ran Ruby's update migrations are fine: new indexes use `IF NOT EXISTS`.
+
+Priority ordering for dequeue is ascending (smaller priority first), matching Ruby GoodJob v4.
 
 ## Retry & Error Logic Compatibility ✅
 
@@ -127,19 +125,26 @@ def backoff(attempt), do: GoodJob.Backoff.exponential(attempt)
 def backoff(attempt), do: GoodJob.Backoff.polynomial(attempt)
 ```
 
+## Advisory lock default
+
+- Ruby GoodJob defaults to session-level `pg_try_advisory_lock` for many lock paths.
+- Elixir GoodJob defaults `:advisory_lock_function` to `:pg_try_advisory_xact_lock` (transaction-scoped) for transactional claim and concurrency checks.
+- Session locks are still used for process heartbeat and `:hybrid` dequeue SQL.
+- Do not flip the Elixir default casually when sharing a database; configure `:advisory_lock_function` / `GOOD_JOB_ADVISORY_LOCK_FUNCTION` if you need session locks on the Elixir side.
+
 ## Best Practices
 
-1. **Use consistent `max_attempts`** across Ruby and Elixir jobs in the same queue
-2. **Use constant backoff** if you need exact Ruby GoodJob behavior
-3. **Use exponential backoff** for better Elixir ecosystem alignment (default)
-4. **Test job processing** from both sides to ensure compatibility
+1. Use consistent `max_attempts` across Ruby and Elixir jobs in the same queue
+2. Keep the default constant backoff when you need Ruby ActiveJob `retry_on` parity; override `backoff/1` for exponential or other strategies
+3. Test job processing from both sides when sharing a queue
+4. Run Elixir migrations (including parity indexes) on shared databases that were created only from older Elixir installs
 
 ## Migration Notes
 
 If you're migrating from Ruby GoodJob to Elixir GoodJob:
 
-1. **No schema changes needed** - our migrations match Ruby's exactly
-2. **Update job definitions** - convert from ActiveJob to `use GoodJob.Job`
-3. **Update error handling** - convert from exceptions to explicit returns
-4. **Test thoroughly** - ensure retry logic behaves as expected
+1. Confirm schema and indexes: Ruby update migrations or Elixir's install plus `add_good_job_parity_indexes`
+2. Update job definitions from ActiveJob to `use GoodJob.Job`
+3. Update error handling from exceptions to explicit returns
+4. Test retry and claim behavior on the shared database
 

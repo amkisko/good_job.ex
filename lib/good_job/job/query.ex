@@ -261,11 +261,13 @@ defmodule GoodJob.Job.Query do
   end
 
   @doc """
-  Orders jobs for dequeueing (priority DESC NULLS LAST, created_at ASC).
+  Orders jobs for dequeueing (priority ASC NULLS LAST, created_at ASC).
+
+  Matches Ruby GoodJob v4 and `order_for_candidate_lookup/1`: smaller priority runs first.
   """
   def dequeueing_ordered(query \\ Job) do
     order_by(query, [j],
-      desc: fragment("? NULLS LAST", j.priority),
+      asc_nulls_last: j.priority,
       asc: j.inserted_at
     )
   end
