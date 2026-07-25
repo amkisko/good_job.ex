@@ -45,12 +45,12 @@ defmodule GoodJob.RepoPoolTest do
 
     {:ok, conn} = Postgrex.start_link(conn_opts)
 
-    on_exit(fn ->
+    try do
+      assert :ok == RepoPool.set_timeouts(conn)
+    after
       if Process.alive?(conn) do
-        GenServer.stop(conn)
+        Process.exit(conn, :kill)
       end
-    end)
-
-    assert :ok == RepoPool.set_timeouts(conn)
+    end
   end
 end
