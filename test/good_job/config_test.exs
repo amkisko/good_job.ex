@@ -207,9 +207,8 @@ defmodule GoodJob.ConfigTest do
   end
 
   describe "queue_select_limit/0" do
-    test "returns limit or nil" do
-      limit = Config.queue_select_limit()
-      assert is_integer(limit) or is_nil(limit)
+    test "defaults to 1000" do
+      assert Config.queue_select_limit() == 1000
     end
   end
 

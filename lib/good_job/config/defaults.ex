@@ -25,7 +25,7 @@ defmodule GoodJob.Config.Defaults do
     notifier_channel: "good_job",
     notifier_wait_interval: 1_000,
     notifier_keepalive_interval: 10_000,
-    queue_select_limit: nil,
+    queue_select_limit: 1000,
     cleanup_discarded_jobs: true,
     cleanup_preserved_jobs_before_seconds_ago: 1_209_600,
     cleanup_preserved_jobs_max_count: nil,

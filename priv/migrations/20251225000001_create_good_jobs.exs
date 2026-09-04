@@ -179,6 +179,12 @@ defmodule GoodJob.Migrations.CreateGoodJobs do
     WHERE finished_at IS NOT NULL AND error IS NOT NULL
     """)
 
+    execute("""
+    CREATE INDEX index_good_jobs_on_discarded_job_class
+    ON good_jobs (job_class, finished_at)
+    WHERE finished_at IS NOT NULL AND error IS NOT NULL
+    """)
+
     create index(:good_jobs, [:scheduled_at, :queue_name],
       name: :index_good_jobs_on_scheduled_at_and_queue_name
     )

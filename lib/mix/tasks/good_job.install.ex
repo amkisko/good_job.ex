@@ -365,6 +365,11 @@ defmodule Mix.Tasks.GoodJob.Install do
             name: :index_good_jobs_on_job_class
           )
 
+          create index(:good_jobs, [:job_class, :finished_at],
+            where: "finished_at IS NOT NULL AND error IS NOT NULL",
+            name: :index_good_jobs_on_discarded_job_class
+          )
+
           create index(:good_jobs, [:labels],
             using: :gin,
             where: "labels IS NOT NULL",

@@ -42,7 +42,7 @@ defmodule GoodJob.Web.DataLoader do
     job_class = Keyword.get(opts, :job_class)
     search = Keyword.get(opts, :search)
 
-    query = Job |> order_by([j], desc: j.inserted_at)
+    query = Job |> order_by([j], desc: j.inserted_at, desc: j.id)
 
     query = apply_state_filter(query, state)
     query = apply_queue_filter(query, queue)
@@ -132,7 +132,7 @@ defmodule GoodJob.Web.DataLoader do
     per_page = Keyword.get(opts, :per_page, @default_per_page)
     alias GoodJob.BatchRecord
 
-    query = BatchRecord |> order_by([b], desc: b.inserted_at)
+    query = BatchRecord |> order_by([b], desc: b.inserted_at, desc: b.id)
 
     total_count = Repo.repo().aggregate(query, :count, :id)
 

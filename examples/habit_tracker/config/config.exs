@@ -49,7 +49,7 @@ config :good_job, :config,
   cleanup_discarded_jobs: true,
   cleanup_preserved_jobs_before_seconds_ago: 1_209_600,  # 14 days
   shutdown_timeout: 25,
-  queue_select_limit: nil,  # No limit (or set to 1000+ for large queues)
+  queue_select_limit: 1000,
   enable_pauses: false,
   advisory_lock_heartbeat: false,
   pubsub_server: HabitTracker.PubSub,

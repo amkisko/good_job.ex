@@ -12,7 +12,7 @@ This allows you to:
 
 Both implementations share the same Protocol tables and columns (`good_jobs`, `good_job_processes`, `good_job_executions`, batches, settings).
 
-Indexes are intended to match Ruby GoodJob 4.x. Elixir ships an additive migration (`add_good_job_parity_indexes`) for indexes that older Elixir installs may lack. Shared databases that already ran Ruby's update migrations are fine: new indexes use `IF NOT EXISTS`.
+Indexes are intended to match Ruby GoodJob 4.x. Elixir ships additive migrations (`add_good_job_parity_indexes`, `add_index_good_jobs_discarded_job_class`) for indexes that older Elixir installs may lack. Shared databases that already ran Ruby's update migrations are fine: new indexes use `IF NOT EXISTS`.
 
 Priority ordering for dequeue is ascending (smaller priority first), matching Ruby GoodJob v4.
 

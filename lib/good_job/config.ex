@@ -35,7 +35,7 @@ defmodule GoodJob.Config do
     * `:notifier_channel` - PostgreSQL channel name for LISTEN/NOTIFY (default: `"good_job"`)
     * `:notifier_wait_interval` - Wait interval for NOTIFY in milliseconds (default: `1_000`)
     * `:notifier_keepalive_interval` - Keepalive interval in milliseconds (default: `10_000`)
-    * `:queue_select_limit` - Number of jobs to query before acquiring advisory locks (default: `nil`, no limit)
+    * `:queue_select_limit` - Number of jobs to query before acquiring advisory locks (default: `1000`)
     * `:cleanup_discarded_jobs` - Whether to automatically destroy discarded jobs (default: `true`)
     * `:cleanup_preserved_jobs_before_seconds_ago` - Seconds to preserve jobs before cleanup (default: `1_209_600` = 14 days)
     * `:cleanup_preserved_jobs_max_count` - Maximum number of preserved jobs/executions to keep (default: `nil`, disabled)
@@ -431,9 +431,9 @@ defmodule GoodJob.Config do
   @doc """
   Returns the queue select limit (number of jobs to query before acquiring advisory locks).
 
-  Returns `nil` if not configured (no limit).
+  Defaults to 1000. Set an explicit integer in application config to override.
   This limit helps avoid locking too many rows when selecting eligible jobs from large queues.
-      Should be higher than total concurrent processes across all good_job schedulers.
+  Should be higher than total concurrent processes across all good_job schedulers.
   """
   def queue_select_limit do
     get(:queue_select_limit, Defaults.get(:queue_select_limit))
