@@ -120,6 +120,16 @@ defmodule GoodJob.Protocol.DeserializerTest do
         Deserializer.deserialize_job_module(job_class, invalid_params)
       end
     end
+
+    test "does not create an atom for an unknown prefixed Elixir job" do
+      job_class = "Elixir.UntrustedJob#{System.unique_integer([:positive])}"
+
+      assert_raise RuntimeError, ~r/Job module not found/, fn ->
+        Deserializer.deserialize_job_module(job_class, %{"invalid" => "data"})
+      end
+
+      assert_raise ArgumentError, fn -> String.to_existing_atom(job_class) end
+    end
   end
 
   describe "deserialize_args/1" do

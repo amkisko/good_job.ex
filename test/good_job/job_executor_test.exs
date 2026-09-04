@@ -399,15 +399,16 @@ defmodule GoodJob.JobExecutorTest do
       assert {:ok, :ok} = result
     end
 
-    test "handles job module without perform/1" do
+    test "rejects an unknown job module without creating it" do
       repo = Repo.repo()
       Ecto.Adapters.SQL.Sandbox.checkout(repo)
+      job_class = "Elixir.UntrustedExecutorJob#{System.unique_integer([:positive])}"
 
       job =
         %Job{
           id: Ecto.UUID.generate(),
           active_job_id: Ecto.UUID.generate(),
-          job_class: "Elixir.NonExistentModule",
+          job_class: job_class,
           serialized_params: %{"arguments" => [%{}]},
           queue_name: "default",
           executions_count: 0
@@ -415,9 +416,9 @@ defmodule GoodJob.JobExecutorTest do
         |> Job.changeset(%{})
         |> repo.insert!()
 
-      assert_raise RuntimeError, ~r/does not implement perform\/1/, fn ->
-        JobExecutor.execute(job, nil)
-      end
+      assert {:error, %RuntimeError{message: message}} = JobExecutor.execute(job, nil)
+      assert message =~ "Job module not found"
+      assert_raise ArgumentError, fn -> String.to_existing_atom(job_class) end
     end
   end
 end

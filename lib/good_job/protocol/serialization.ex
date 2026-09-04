@@ -278,12 +278,7 @@ defmodule GoodJob.Protocol.Serialization do
 
   defp deserialize_arguments(arguments), do: arguments
 
-  defp deserialize_argument(arg) when is_binary(arg) do
-    case String.starts_with?(arg, ":") do
-      true -> String.slice(arg, 1..-1//1) |> String.to_atom()
-      false -> arg
-    end
-  end
+  defp deserialize_argument(arg) when is_binary(arg), do: arg
 
   defp deserialize_argument(arg) when is_number(arg), do: arg
   defp deserialize_argument(arg) when is_boolean(arg), do: arg
@@ -416,8 +411,7 @@ defmodule GoodJob.Protocol.Serialization do
           try do
             String.to_existing_atom(value)
           rescue
-            ArgumentError ->
-              String.to_atom(value)
+            ArgumentError -> value
           end
         else
           value

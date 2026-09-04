@@ -5,12 +5,22 @@ defmodule GoodJob.Web.LiveDashboardPage.Helpers do
 
   @default_poll_interval 30_000
 
+  @views %{
+    "overview" => :overview,
+    "jobs" => :jobs,
+    "job_detail" => :job_detail,
+    "cron" => :cron,
+    "pauses" => :pauses,
+    "batches" => :batches,
+    "processes" => :processes
+  }
+
   @doc """
   Parses view from params.
   """
-  def parse_view(%{"view" => view})
-      when view in ["overview", "jobs", "job_detail", "cron", "pauses", "batches", "processes"],
-      do: String.to_atom(view)
+  def parse_view(%{"view" => view}) when is_binary(view) do
+    Map.get(@views, view, :overview)
+  end
 
   def parse_view(_), do: :overview
 
@@ -50,18 +60,25 @@ defmodule GoodJob.Web.LiveDashboardPage.Helpers do
   Builds URI for navigation.
   """
   def build_uri(view, job_id, assigns) do
-    params = ["view=#{view}"]
+    query =
+      [view: to_string(view)]
+      |> maybe_add_query(:job_id, job_id)
+      |> maybe_add_query(:page, page_query_value(assigns))
+      |> maybe_add_query(:state, assigns[:filter_state])
+      |> maybe_add_query(:queue, assigns[:filter_queue])
 
-    params = if job_id, do: ["job_id=#{job_id}" | params], else: params
-
-    params =
-      if assigns[:current_page] && assigns.current_page > 1,
-        do: ["page=#{assigns.current_page}" | params],
-        else: params
-
-    params = if assigns[:filter_state], do: ["state=#{assigns.filter_state}" | params], else: params
-    params = if assigns[:filter_queue], do: ["queue=#{assigns.filter_queue}" | params], else: params
-
-    "/dashboard/good_job?" <> Enum.join(params, "&")
+    "/dashboard/good_job?" <> URI.encode_query(query)
   end
+
+  defp page_query_value(assigns) do
+    page = assigns[:current_page]
+
+    if is_integer(page) and page > 1 do
+      page
+    end
+  end
+
+  defp maybe_add_query(query, _key, nil), do: query
+  defp maybe_add_query(query, _key, ""), do: query
+  defp maybe_add_query(query, key, value), do: query ++ [{key, to_string(value)}]
 end

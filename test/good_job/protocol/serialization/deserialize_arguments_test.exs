@@ -83,6 +83,36 @@ defmodule GoodJob.Protocol.Serialization.DeserializeArgumentsTest do
       assert atom == :test_symbol
     end
 
+    test "keeps unknown SymbolSerializer values as strings" do
+      symbol = "untrusted_symbol_#{System.unique_integer([:positive])}"
+
+      serialized = %{
+        "job_class" => "TestJob",
+        "arguments" => [
+          %{"_aj_serialized" => "ActiveJob::Serializers::SymbolSerializer", "value" => symbol}
+        ],
+        "executions" => 0
+      }
+
+      {:ok, _job_class, [value], _executions, _metadata} =
+        Serialization.from_active_job(serialized)
+
+      assert value == symbol
+    end
+
+    test "keeps colon-prefixed strings as strings" do
+      serialized = %{
+        "job_class" => "TestJob",
+        "arguments" => [":untrusted_symbol_#{System.unique_integer([:positive])}"],
+        "executions" => 0
+      }
+
+      {:ok, _job_class, [value], _executions, _metadata} =
+        Serialization.from_active_job(serialized)
+
+      assert value == hd(serialized["arguments"])
+    end
+
     test "deserializes BigDecimalSerializer" do
       serialized = %{
         "job_class" => "TestJob",

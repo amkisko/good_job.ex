@@ -113,9 +113,19 @@ defmodule GoodJob.DatabaseURL do
   @spec configure_repo(module(), String.t()) :: :ok
   def configure_repo(repo_module, url) when is_atom(repo_module) and is_binary(url) do
     config = parse(url)
-    app = repo_module |> Module.split() |> List.first() |> String.downcase() |> String.to_atom()
+    _ = Code.ensure_loaded(repo_module)
 
-    Application.put_env(app, repo_module, config)
+    application =
+      case Application.get_application(repo_module) do
+        nil ->
+          raise ArgumentError,
+                "cannot configure #{inspect(repo_module)}: it is not loaded as part of an OTP application"
+
+        loaded_application ->
+          loaded_application
+      end
+
+    Application.put_env(application, repo_module, config)
     :ok
   end
 
@@ -181,31 +191,33 @@ defmodule GoodJob.DatabaseURL do
 
   defp default_port(Ecto.Adapters.Postgres), do: 5432
 
+  @known_query_keys %{
+    "pool_size" => :pool_size,
+    "pool_timeout" => :pool_timeout,
+    "timeout" => :timeout,
+    "ssl" => :ssl,
+    "ssl_opts" => :ssl_opts,
+    "parameters" => :parameters,
+    "socket" => :socket,
+    "socket_dir" => :socket_dir,
+    "prepare" => :prepare,
+    "queue_target" => :queue_target,
+    "queue_interval" => :queue_interval,
+    "idle_interval" => :idle_interval
+  }
+
   defp parse_query(nil), do: []
   defp parse_query(""), do: []
 
   defp parse_query(query_string) when is_binary(query_string) do
     query_string
     |> URI.decode_query()
-    |> Enum.map(fn {key, value} ->
-      # Convert string keys to atoms where appropriate
-      atom_key = normalize_query_key(key)
-      {atom_key, normalize_query_value(value)}
+    |> Enum.flat_map(fn {key, value} ->
+      case Map.get(@known_query_keys, key) do
+        nil -> []
+        atom_key -> [{atom_key, normalize_query_value(value)}]
+      end
     end)
-    |> Keyword.new()
-  end
-
-  defp normalize_query_key(key) when is_binary(key) do
-    # Convert common query parameters to atoms
-    case key do
-      "pool_size" -> :pool_size
-      "pool_timeout" -> :pool_timeout
-      "timeout" -> :timeout
-      "ssl" -> :ssl
-      "ssl_opts" -> :ssl_opts
-      "parameters" -> :parameters
-      _ -> String.to_atom(key)
-    end
   end
 
   defp normalize_query_value(value) when is_binary(value) do

@@ -237,22 +237,9 @@ defmodule GoodJob.Protocol.Deserializer do
         module
 
       {:error, _} ->
-        # If job_class_string already looks like an Elixir module name
-        # (starts with "Elixir."), allow it to fall through so that later
-        # checks (in perform_job/3) can raise a consistent
-        # "does not implement perform/1" error. This is used by
-        # JobExecutor tests that build jobs with an explicit Elixir module
-        # string like "Elixir.NonExistentModule".
-        if String.starts_with?(job_class_string, "Elixir.") do
-          String.to_atom(atom_string)
-        else
-          # For true unknown Rails/Elixir jobs (e.g. "Rails::UnknownJob" or
-          # "NonExistent.Module.Job"), raise a helpful error message as
-          # expected by the deserializer tests.
-          raise "Job module not found: #{job_class_string}. " <>
-                  "For external jobs, configure it in external_jobs. " <>
-                  "For Elixir jobs, ensure the module name matches the job_class."
-        end
+        raise "Job module not found: #{job_class_string}. " <>
+                "For external jobs, configure it in external_jobs. " <>
+                "For Elixir jobs, ensure the module name matches the job_class."
     end
   end
 

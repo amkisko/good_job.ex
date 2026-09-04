@@ -1,10 +1,13 @@
 # CHANGELOG
 
-## Unreleased
+## 1.0.1 (2026-09-04)
 
-- Fix `Job.dequeueing_ordered/1` to order by priority ascending (smaller first), matching Ruby GoodJob v4 and the claim candidate lookup path.
-- Add migration `add_good_job_parity_indexes` for Ruby GoodJob 4.x indexes missing from older Elixir installs; update the create migration for greenfield installs.
-- Document schema/index honesty, advisory-lock default difference vs Ruby, Hex version pin `~> 1.0.0`, and Ruby `max_threads` in migration examples.
+- Resolve persisted job classes and symbol-like payload values only to existing BEAM atoms.
+- Accept only known DATABASE_URL query parameters and store repo config under the OTP application.
+- Encode queue, state, and job id values in LiveDashboard links.
+- Order dequeue by priority ascending, matching Ruby GoodJob v4.
+- Add a migration for Ruby GoodJob 4.x indexes missing from older Elixir installs.
+- Document schema and index honesty, advisory-lock default versus Ruby, Hex pin `~> 1.0.0`, and Ruby `max_threads`.
 
 ## 1.0.0
 
