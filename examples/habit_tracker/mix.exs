@@ -29,7 +29,7 @@ defmodule HabitTracker.MixProject do
     [
       # Phoenix
       {:phoenix, "~> 1.8"},
-      {:phoenix_live_view, "~> 1.1"},
+      {:phoenix_live_view, "~> 1.1.33"},
       {:phoenix_live_dashboard, "~> 0.8.0"},
       {:telemetry_metrics, "~> 0.6"},
       {:telemetry_poller, "~> 1.0"},

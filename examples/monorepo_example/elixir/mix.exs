@@ -32,7 +32,7 @@ defmodule MonorepoExample.MixProject do
       {:jason, "~> 1.4"},
       # Phoenix dependencies for web interface
       {:phoenix, "~> 1.8"},
-      {:phoenix_live_view, "~> 1.1"},
+      {:phoenix_live_view, "~> 1.1.33"},
       {:phoenix_html, "~> 4.3"},
       {:phoenix_live_reload, "~> 1.2", only: [:dev, :test]},
       {:phoenix_live_dashboard, "~> 0.8"},
