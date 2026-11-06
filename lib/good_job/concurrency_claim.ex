@@ -146,11 +146,13 @@ defmodule GoodJob.ConcurrencyClaim do
   def job_finished(%Job{} = job) do
     release_job(job.id)
 
-    if not is_nil(job.finished_at) do
-      Repo.repo().delete_all(from(c in __MODULE__, where: c.job_id == ^job.id))
-      :ok
-    else
-      apply_pending_promotion(job.id)
+    case job.finished_at do
+      nil ->
+        apply_pending_promotion(job.id)
+
+      _ ->
+        Repo.repo().delete_all(from(c in __MODULE__, where: c.job_id == ^job.id))
+        :ok
     end
   end
 

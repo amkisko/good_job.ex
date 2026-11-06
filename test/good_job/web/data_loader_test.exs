@@ -1,8 +1,8 @@
 defmodule GoodJob.Web.DataLoaderTest do
   use GoodJob.Testing.JobCase, async: false
 
-  alias GoodJob.Web.DataLoader
   alias GoodJob.Repo
+  alias GoodJob.Web.DataLoader
 
   defp stamp_created_at(job, datetime) do
     job
