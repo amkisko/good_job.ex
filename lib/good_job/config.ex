@@ -49,6 +49,8 @@ defmodule GoodJob.Config do
     * `:lock_strategy` - Job dequeue locking: `:advisory` (default), `:skiplocked`, or `:hybrid`. Environment: `GOOD_JOB_LOCK_STRATEGY`. Use one strategy per database; mixing strategies across workers is unsupported.
     * `:idle_timeout` - When set (positive integer seconds), stops `GoodJob.Supervisor` after no job execution and no running workers for this duration. Default: `nil` (disabled). Environment: `GOOD_JOB_IDLE_TIMEOUT`
     * `:stale_lock_release_after_seconds` - How stale a row lock must be before the periodic sweep clears `locked_by_id` (default: `60`). Increase for jobs that run longer than a minute without updating lock state. Environment: `GOOD_JOB_STALE_LOCK_RELEASE_AFTER_SECONDS`
+    * `:dequeue_query_sort` - Candidate dequeue order after priority: `:created_at` (default) or `:scheduled_at` (Ruby GoodJob v5 direction). Environment: `GOOD_JOB_DEQUEUE_QUERY_SORT`
+    * `:threads` - Preferred name for concurrent workers per scheduler pool (alias of `:max_processes`). Environment: `GOOD_JOB_THREADS`. When both are set, `:threads` wins.
   """
 
   alias GoodJob.Config.{Defaults, Env, Validation}
@@ -92,7 +94,9 @@ defmodule GoodJob.Config do
           external_jobs: map(),
           lock_strategy: :advisory | :skiplocked | :hybrid,
           idle_timeout: pos_integer() | nil,
-          stale_lock_release_after_seconds: pos_integer() | nil
+          stale_lock_release_after_seconds: pos_integer() | nil,
+          dequeue_query_sort: :created_at | :scheduled_at,
+          threads: pos_integer() | nil
         }
 
   @doc """
@@ -169,9 +173,30 @@ defmodule GoodJob.Config do
 
   @doc """
   Returns the maximum concurrent processes per scheduler.
+
+  Prefers `:threads` / `GOOD_JOB_THREADS` when set (Ruby GoodJob 4.22+ naming).
   """
   def max_processes do
-    get(:max_processes, Defaults.get(:max_processes))
+    case get(:threads, nil) do
+      threads when is_integer(threads) and threads > 0 -> threads
+      _ -> get(:max_processes, Defaults.get(:max_processes))
+    end
+  end
+
+  @doc """
+  Alias for `max_processes/0` matching Ruby GoodJob's `threads` name.
+  """
+  def threads, do: max_processes()
+
+  @doc """
+  Returns dequeue candidate sort after priority (`:created_at` or `:scheduled_at`).
+  """
+  def dequeue_query_sort do
+    case get(:dequeue_query_sort, Defaults.get(:dequeue_query_sort)) do
+      :scheduled_at -> :scheduled_at
+      "scheduled_at" -> :scheduled_at
+      _ -> :created_at
+    end
   end
 
   @doc """

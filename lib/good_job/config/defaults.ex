@@ -36,7 +36,9 @@ defmodule GoodJob.Config.Defaults do
     external_jobs: %{},
     lock_strategy: :advisory,
     idle_timeout: nil,
-    stale_lock_release_after_seconds: 60
+    stale_lock_release_after_seconds: 60,
+    # Ruby GoodJob v5 will make :scheduled_at the only dequeue sort.
+    dequeue_query_sort: :created_at
   }
 
   @doc """

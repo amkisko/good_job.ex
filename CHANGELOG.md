@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## Unreleased
+
+- Align schema with Ruby GoodJob 4.24.1 update migrations 16–22: queue-scoped dequeue indexes, executions and batch query indexes, cron index order, drop redundant unfinished indexes, and create `good_job_concurrency_claims`.
+- Sync the canonical create migration and `mix good_job.install` template with that schema (including `lock_type` on `good_jobs` and the claims table).
+- Default `queue_select_limit` to 1000; order dashboard job and batch lists by `inserted_at DESC, id DESC`; ship discarded `job_class` index (Ruby 1795 / 1762 / 1749).
+- Add label-scoped concurrency checks and `ConcurrencyClaim` grant/wait/promote; release claims on job finish and worker crash; deprecate key-only limits toward Ruby v5.
+- Set `good_jobs.id` from `active_job_id` on enqueue to match Ruby discrete job identity.
+- Add `dequeue_query_sort` (`:created_at` default, `:scheduled_at` for Ruby v5 prep) and `threads` as preferred alias of `max_processes`; document skiplocked rolling migrate.
+
 ## 1.0.1 (2026-09-04)
 
 - Resolve persisted job classes and symbol-like payload values only to existing BEAM atoms.

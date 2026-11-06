@@ -11,6 +11,8 @@ defmodule GoodJob.Config.Env do
     |> maybe_put(:execution_mode, System.get_env("GOOD_JOB_EXECUTION_MODE"))
     |> maybe_put(:queues, System.get_env("GOOD_JOB_QUEUES"))
     |> maybe_put(:max_processes, System.get_env("GOOD_JOB_MAX_PROCESSES"))
+    |> maybe_put(:threads, System.get_env("GOOD_JOB_THREADS"))
+    |> maybe_put(:dequeue_query_sort, System.get_env("GOOD_JOB_DEQUEUE_QUERY_SORT"))
     |> maybe_put(:poll_interval, System.get_env("GOOD_JOB_POLL_INTERVAL"))
     |> maybe_put(:max_cache, System.get_env("GOOD_JOB_MAX_CACHE"))
     |> maybe_put(:cleanup_interval_seconds, System.get_env("GOOD_JOB_CLEANUP_INTERVAL_SECONDS"))
@@ -44,6 +46,13 @@ defmodule GoodJob.Config.Env do
     |> maybe_put(:cron, parse_cron_env())
   end
 
+  defp parse_dequeue_query_sort(value) when is_binary(value) do
+    case String.downcase(String.trim(value)) do
+      "scheduled_at" -> :scheduled_at
+      _ -> :created_at
+    end
+  end
+
   defp parse_lock_strategy(value) when is_binary(value) do
     case String.downcase(String.trim(value)) do
       "advisory" -> :advisory
@@ -73,6 +82,12 @@ defmodule GoodJob.Config.Env do
 
       :max_processes ->
         Map.put(config, key, String.to_integer(value))
+
+      :threads ->
+        Map.put(config, key, String.to_integer(value))
+
+      :dequeue_query_sort ->
+        Map.put(config, key, parse_dequeue_query_sort(value))
 
       :poll_interval ->
         Map.put(config, key, String.to_integer(value))

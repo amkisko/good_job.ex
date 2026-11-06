@@ -6,6 +6,7 @@ defmodule GoodJob.Config.Validation do
   # Valid execution modes
   @valid_execution_modes [:external, :async, :inline]
   @valid_lock_strategies [:advisory, :skiplocked, :hybrid]
+  @valid_dequeue_query_sorts [:created_at, :scheduled_at]
   @valid_advisory_lock_functions ~w(
     pg_try_advisory_xact_lock
     pg_advisory_xact_lock
@@ -45,8 +46,28 @@ defmodule GoodJob.Config.Validation do
     validate_lock_strategy!(config)
     validate_idle_timeout!(config)
     validate_stale_lock_release_after_seconds!(config)
+    validate_dequeue_query_sort!(config)
+    validate_threads!(config)
 
     config
+  end
+
+  defp validate_dequeue_query_sort!(config) do
+    sort = config[:dequeue_query_sort]
+
+    if sort && sort not in @valid_dequeue_query_sorts do
+      raise ArgumentError,
+            "GoodJob dequeue_query_sort must be one of #{inspect(@valid_dequeue_query_sorts)}. Got: #{inspect(sort)}"
+    end
+  end
+
+  defp validate_threads!(config) do
+    threads = config[:threads]
+
+    if threads && (not is_integer(threads) or threads < 1) do
+      raise ArgumentError,
+            "GoodJob threads must be a positive integer. Got: #{inspect(threads)}"
+    end
   end
 
   defp validate_cleanup_max_count!(config) do

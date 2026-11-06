@@ -32,7 +32,7 @@ Iteration 1 re-audit: no open findings that block the three imports. Pipeline da
 
 ## Next
 
-Distill into CHANGELOG.md when cutting the next version. Do not bump mix.exs until asked. Commit and PR only when asked.
+Superseded by `docs/plans/20261106095035_ruby-4-24-and-v5-parity.md` and Unreleased CHANGELOG entries on `feature/ruby-4-24-and-v5-prep`.
 
 Open later: handled_exceptions as an Elixir-shaped config if operators need UndefinedFunctionError discarded by default; bounded dashboard search if ILIKE on serialized_params hits real load; lock-strategy job-row lifecycle if hybrid session unlock leaks after finish.
 

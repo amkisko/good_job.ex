@@ -212,6 +212,35 @@ defmodule GoodJob.ConfigTest do
     end
   end
 
+  describe "dequeue_query_sort/0" do
+    test "defaults to :created_at" do
+      assert Config.dequeue_query_sort() == :created_at
+    end
+  end
+
+  describe "threads/0" do
+    test "aliases max_processes by default" do
+      assert Config.threads() == Config.max_processes()
+    end
+
+    test "prefers threads over max_processes when set" do
+      original_config = Application.get_env(:good_job, :config, %{})
+
+      on_exit(fn ->
+        Application.put_env(:good_job, :config, original_config)
+      end)
+
+      Application.put_env(
+        :good_job,
+        :config,
+        Map.merge(Map.new(original_config), %{max_processes: 3, threads: 7})
+      )
+
+      assert Config.max_processes() == 7
+      assert Config.threads() == 7
+    end
+  end
+
   describe "cleanup_discarded_jobs?/0" do
     test "returns boolean" do
       result = Config.cleanup_discarded_jobs?()

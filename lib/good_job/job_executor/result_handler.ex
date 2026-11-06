@@ -5,7 +5,7 @@ defmodule GoodJob.JobExecutor.ResultHandler do
 
   require Logger
   import Ecto.Query
-  alias GoodJob.{Execution, Job, Repo, Utils}
+  alias GoodJob.{ConcurrencyClaim, Execution, Job, Repo, Utils}
 
   defmodule ExecutionContext do
     @moduledoc false
@@ -176,9 +176,11 @@ defmodule GoodJob.JobExecutor.ResultHandler do
         |> repo.update!()
       end)
 
+      finish_concurrency_claims(job.id)
       :ok
     else
       repo.delete(job)
+      finish_concurrency_claims(job.id)
       :ok
     end
   end
@@ -227,6 +229,7 @@ defmodule GoodJob.JobExecutor.ResultHandler do
     end)
     |> case do
       {:ok, _} ->
+        finish_concurrency_claims(fresh_job.id)
         GoodJob.PubSub.broadcast(:job_completed, fresh_job.id)
         :ok
 
@@ -350,6 +353,8 @@ defmodule GoodJob.JobExecutor.ResultHandler do
             )
           end
         end
+
+        finish_concurrency_claims(fresh_job.id)
 
         if finished_at do
           Logger.warning("Job #{fresh_job.id} exhausted after #{executions_count} attempts")
@@ -645,6 +650,17 @@ defmodule GoodJob.JobExecutor.ResultHandler do
   end
 
   defp format_backtrace(_error, _), do: []
+
+  defp finish_concurrency_claims(job_id) when is_binary(job_id) do
+    if ConcurrencyClaim.table_exists?() do
+      case Repo.repo().get(Job, job_id) do
+        %Job{} = job -> ConcurrencyClaim.job_finished(job)
+        _ -> ConcurrencyClaim.release_job(job_id)
+      end
+    end
+
+    :ok
+  end
 
   defp format_duration(duration_nanoseconds) do
     total_microseconds = div(duration_nanoseconds, 1_000)

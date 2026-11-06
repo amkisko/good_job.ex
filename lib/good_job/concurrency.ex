@@ -2,13 +2,17 @@ defmodule GoodJob.Concurrency do
   @moduledoc """
   Concurrency control for jobs.
 
-  Allows limiting the number of concurrent jobs per concurrency key,
-  and throttling job enqueueing/execution.
+  Limits and throttles can be scoped by `concurrency_key` (legacy, shared with
+  Ruby GoodJob before v5) or by a job `label` (preferred; claim key `label:<name>`).
+
+  When `good_job_concurrency_claims` exists, perform limits grant/wait/promote
+  through `GoodJob.ConcurrencyClaim`.
   """
 
   require Logger
-  alias GoodJob.{AdvisoryLock, Execution, Job, Repo}
   import Ecto.Query
+
+  alias GoodJob.{AdvisoryLock, ConcurrencyClaim, Execution, Job, Repo}
 
   @doc """
   Checks if a job can be enqueued based on concurrency limits.
@@ -17,72 +21,95 @@ defmodule GoodJob.Concurrency do
 
   If the limit or throttle is exceeded, or the advisory lock could not be taken, the result is
   `{:ok, {:error, reason}}` where `reason` is `:limit_exceeded`, `:throttle_exceeded`, or
-  `:lock_failed`. That shape comes from the Repo’s arity-0 transaction callback wrapping the return
-  value (see [Ecto.Repo `transaction/1`](https://hexdocs.pm/ecto/Ecto.Repo.html#c:transaction/1); not a rolled-back transaction).
+  `:lock_failed`.
   """
   def check_enqueue_limit(concurrency_key, config) when is_binary(concurrency_key) do
-    repo = Repo.repo()
-
-    repo.transaction(fn ->
-      lock_key = AdvisoryLock.key_to_lock_key(concurrency_key)
-
-      case AdvisoryLock.lock(lock_key) do
-        true ->
-          check_limits(concurrency_key, config, :enqueue, repo)
-
-        false ->
-          {:error, :lock_failed}
-      end
-    end)
+    check_enqueue_limit(concurrency_key, config, [])
   end
 
-  def check_enqueue_limit(nil, _config) do
-    {:ok, :ok}
+  def check_enqueue_limit(nil, _config), do: {:ok, :ok}
+
+  def check_enqueue_limit(concurrency_key, config, opts)
+      when is_binary(concurrency_key) and is_list(opts) do
+    config = normalize_config(config)
+    maybe_warn_key_only(config)
+
+    with_advisory_lock(lock_name(config, concurrency_key), fn ->
+      check_limits(scope_for(config, concurrency_key), config, :enqueue, Repo.repo(), nil, opts)
+    end)
   end
 
   @doc """
   Checks if a job can be performed based on concurrency limits.
 
-  Returns `{:ok, :ok}` if allowed.
-
-  Otherwise returns `{:ok, {:error, reason}}` with `reason` in `:limit_exceeded`, `:throttle_exceeded`,
-  or `:lock_failed` (see `check_enqueue_limit/2` for why this is `{:ok, {:error, _}}`).
+  `opts` may include `:job_id` (good_jobs row id), `:locked_by_id`, and `:labels`.
   """
-  def check_perform_limit(concurrency_key, job_id, config) when is_binary(concurrency_key) do
+  def check_perform_limit(concurrency_key, active_job_id, config) when is_binary(concurrency_key) do
+    check_perform_limit(concurrency_key, active_job_id, config, [])
+  end
+
+  def check_perform_limit(nil, _active_job_id, _config), do: {:ok, :ok}
+
+  def check_perform_limit(concurrency_key, active_job_id, config, opts)
+      when is_binary(concurrency_key) and is_list(opts) do
+    config = normalize_config(config)
+    maybe_warn_key_only(config)
+    opts = Keyword.put_new(opts, :concurrency_key, concurrency_key)
+
+    with_advisory_lock(lock_name(config, concurrency_key), fn ->
+      check_limits(scope_for(config, concurrency_key), config, :perform, Repo.repo(), active_job_id, opts)
+    end)
+  end
+
+  @doc """
+  Label-scoped enqueue check (preferred path toward Ruby GoodJob v5).
+  """
+  def check_enqueue_limit_for_label(label, config) when is_binary(label) do
+    config = normalize_config(config) |> Keyword.put(:label, label)
+
+    with_advisory_lock(ConcurrencyClaim.claim_key_for_label(label), fn ->
+      check_limits(Job.with_label(label), config, :enqueue, Repo.repo(), nil, [])
+    end)
+  end
+
+  @doc """
+  Label-scoped perform check with optional claims grant/wait.
+  """
+  def check_perform_limit_for_label(label, active_job_id, config, opts \\ [])
+      when is_binary(label) do
+    config = normalize_config(config) |> Keyword.put(:label, label)
+
+    with_advisory_lock(ConcurrencyClaim.claim_key_for_label(label), fn ->
+      check_limits(Job.with_label(label), config, :perform, Repo.repo(), active_job_id, opts)
+    end)
+  end
+
+  defp with_advisory_lock(lock_name, fun) do
     repo = Repo.repo()
 
     repo.transaction(fn ->
-      lock_key = AdvisoryLock.key_to_lock_key(concurrency_key)
+      lock_key = AdvisoryLock.key_to_lock_key(lock_name)
 
       case AdvisoryLock.lock(lock_key) do
-        true ->
-          check_limits(concurrency_key, config, :perform, repo, job_id)
-
-        false ->
-          {:error, :lock_failed}
+        true -> fun.()
+        false -> {:error, :lock_failed}
       end
     end)
   end
 
-  def check_perform_limit(nil, _job_id, _config) do
-    {:ok, :ok}
-  end
-
-  defp check_limits(concurrency_key, config, type, repo, job_id \\ nil) do
-    config = if is_map(config), do: Map.to_list(config), else: config
-
+  defp check_limits(scope, config, type, repo, active_job_id, opts) do
     limit = get_limit(config, type)
     throttle = get_throttle(config, type)
-    has_enqueue_limit = has_enqueue_limit?(config)
+    has_enqueue_limit = not is_nil(config[:enqueue_limit])
     has_perform_limit = not is_nil(config[:perform_limit])
 
     cond do
-      limit && check_limit_exceeded(concurrency_key, limit, type, repo, job_id, has_enqueue_limit, has_perform_limit) ->
-        GoodJob.Telemetry.concurrency_limit_exceeded(concurrency_key, limit, type)
+      limit && perform_limit_exceeded?(scope, limit, type, repo, active_job_id, has_enqueue_limit, has_perform_limit, config, opts) ->
+        GoodJob.Telemetry.concurrency_limit_exceeded(scope_name(config, opts), limit, type)
         {:error, :limit_exceeded}
 
-      throttle && check_throttle_exceeded(concurrency_key, throttle, type, repo, job_id) ->
-        GoodJob.Telemetry.concurrency_throttle_exceeded(concurrency_key, throttle, type)
+      throttle && check_throttle_exceeded(scope, throttle, type, repo, active_job_id) ->
+        GoodJob.Telemetry.concurrency_throttle_exceeded(scope_name(config, opts), throttle, type)
         {:error, :throttle_exceeded}
 
       true ->
@@ -90,107 +117,145 @@ defmodule GoodJob.Concurrency do
     end
   end
 
-  defp get_limit(config, :enqueue) do
-    config[:enqueue_limit] || config[:total_limit]
-  end
-
-  defp get_limit(config, :perform) do
-    config[:perform_limit] || config[:total_limit]
-  end
-
-  defp has_enqueue_limit?(config) do
-    not is_nil(config[:enqueue_limit])
-  end
-
-  defp get_throttle(config, :enqueue) do
-    config[:enqueue_throttle]
-  end
-
-  defp get_throttle(config, :perform) do
-    config[:perform_throttle]
-  end
-
-  defp check_limit_exceeded(concurrency_key, limit, :enqueue, repo, _job_id, has_enqueue_limit, _has_perform_limit) do
-    enqueue_concurrency =
+  defp perform_limit_exceeded?(scope, limit, :enqueue, repo, _active_job_id, has_enqueue_limit, _has_perform_limit, _config, _opts) do
+    count =
       if has_enqueue_limit do
-        repo.one(
-          from(j in Job,
-            where: j.concurrency_key == ^concurrency_key and is_nil(j.finished_at) and is_nil(j.locked_by_id),
-            select: count(j.id)
-          )
-        )
+        scope
+        |> where([j], is_nil(j.finished_at) and is_nil(j.locked_by_id))
+        |> repo.aggregate(:count, :id)
       else
-        repo.one(
-          from(j in Job,
-            where: j.concurrency_key == ^concurrency_key and is_nil(j.finished_at),
-            select: count(j.id)
-          )
-        )
+        scope
+        |> where([j], is_nil(j.finished_at))
+        |> repo.aggregate(:count, :id)
       end
 
-    enqueue_concurrency + 1 > limit
+    count + 1 > limit
   end
 
-  defp check_limit_exceeded(concurrency_key, limit, :perform, repo, job_id, _has_enqueue_limit, has_perform_limit) do
-    base_query =
-      Job
-      |> Job.unfinished()
-      |> Job.with_concurrency_key(concurrency_key)
+  defp perform_limit_exceeded?(scope, limit, :perform, repo, active_job_id, _has_enqueue_limit, has_perform_limit, config, opts) do
+    job_row_id = Keyword.get(opts, :job_id)
+    locked_by_id = Keyword.get(opts, :locked_by_id)
 
-    performing_count =
-      if has_perform_limit do
-        base_query
+    cond do
+      is_binary(job_row_id) and ConcurrencyClaim.table_exists?() ->
+        claim_key = claim_key(config, opts)
+        not ConcurrencyClaim.claim(
+          key: claim_key,
+          limit: limit,
+          scope: scope,
+          job_id: job_row_id,
+          locked_by_id: locked_by_id
+        )
+
+      has_perform_limit ->
+        scope
         |> Job.locked()
-        |> repo.aggregate(:count, :id)
-      else
-        base_query
-        |> where([j], j.active_job_id != ^job_id)
-        |> repo.aggregate(:count, :id)
-      end
+        |> repo.aggregate(:count, :id) >= limit
 
-    performing_count >= limit
+      true ->
+        scope
+        |> where([j], j.active_job_id != ^active_job_id)
+        |> where([j], is_nil(j.finished_at))
+        |> repo.aggregate(:count, :id) >= limit
+    end
   end
 
-  defp check_throttle_exceeded(concurrency_key, {throttle_limit, throttle_period}, :enqueue, repo, _job_id) do
+  defp check_throttle_exceeded(scope, {throttle_limit, throttle_period}, :enqueue, repo, _active_job_id) do
     cutoff = DateTime.add(DateTime.utc_now(), -throttle_period, :second)
 
-    enqueued_within_period =
-      repo.one(
-        from(j in Job,
-          where: j.concurrency_key == ^concurrency_key and j.inserted_at >= ^cutoff,
-          select: count(j.id)
-        )
-      )
+    count =
+      scope
+      |> where([j], j.inserted_at >= ^cutoff)
+      |> repo.aggregate(:count, :id)
 
-    enqueued_within_period + 1 > throttle_limit
+    count + 1 > throttle_limit
   end
 
-  defp check_throttle_exceeded(concurrency_key, {throttle_limit, throttle_period}, :perform, repo, job_id) do
+  defp check_throttle_exceeded(scope, {throttle_limit, throttle_period}, :perform, repo, active_job_id) do
     cutoff = DateTime.add(DateTime.utc_now(), -throttle_period, :second)
 
     throttle_error_string =
       "GoodJob::ActiveJobExtensions::Concurrency::ThrottleExceededError: GoodJob::ActiveJobExtensions::Concurrency::ThrottleExceededError"
 
-    base_query =
-      from(e in Execution,
-        join: j in Job,
-        on: e.active_job_id == j.active_job_id,
-        where: j.concurrency_key == ^concurrency_key and e.inserted_at >= ^cutoff
-      )
+    scoped_active_job_ids = repo.all(from(j in scope, select: j.active_job_id))
 
     allowed_active_job_ids =
-      repo.all(
-        base_query
-        |> where([e, j], is_nil(e.error) or e.error != ^throttle_error_string)
-        |> order_by([e], asc: e.inserted_at)
-        |> limit(^throttle_limit)
-        |> select([e], e.active_job_id)
-      )
+      if scoped_active_job_ids == [] do
+        []
+      else
+        repo.all(
+          from(e in Execution,
+            where: e.active_job_id in ^scoped_active_job_ids,
+            where: e.inserted_at >= ^cutoff,
+            where: is_nil(e.error) or e.error != ^throttle_error_string,
+            order_by: [asc: e.inserted_at],
+            limit: ^throttle_limit,
+            select: e.active_job_id
+          )
+        )
+      end
 
-    if allowed_active_job_ids == [] do
-      false
+    allowed_active_job_ids != [] and active_job_id not in allowed_active_job_ids
+  end
+
+  defp get_limit(config, :enqueue), do: config[:enqueue_limit] || config[:total_limit]
+  defp get_limit(config, :perform), do: config[:perform_limit] || config[:total_limit]
+
+  defp get_throttle(config, :enqueue), do: config[:enqueue_throttle]
+  defp get_throttle(config, :perform), do: config[:perform_throttle]
+
+  defp normalize_config(config) when is_map(config), do: Map.to_list(config)
+  defp normalize_config(config) when is_list(config), do: config
+  defp normalize_config(_), do: []
+
+  defp scope_for(config, concurrency_key) do
+    case config[:label] do
+      label when is_binary(label) and label != "" -> Job.with_label(label)
+      _ -> Job.with_concurrency_key(concurrency_key)
+    end
+  end
+
+  defp lock_name(config, concurrency_key) do
+    case config[:label] do
+      label when is_binary(label) and label != "" -> ConcurrencyClaim.claim_key_for_label(label)
+      _ -> concurrency_key
+    end
+  end
+
+  defp claim_key(config, opts) do
+    case config[:label] do
+      label when is_binary(label) and label != "" ->
+        ConcurrencyClaim.claim_key_for_label(label)
+
+      _ ->
+        key = Keyword.get(opts, :concurrency_key) || config[:concurrency_key] || "all"
+        ConcurrencyClaim.claim_key_for_concurrency_key(key)
+    end
+  end
+
+  defp scope_name(config, opts) do
+    config[:label] || Keyword.get(opts, :concurrency_key) || "concurrency"
+  end
+
+  defp maybe_warn_key_only(config) do
+    label = config[:label]
+
+    if is_nil(label) or label == "" do
+      case :persistent_term.get({__MODULE__, :key_only_warned}, false) do
+        true ->
+          :ok
+
+        false ->
+          :persistent_term.put({__MODULE__, :key_only_warned}, true)
+
+          Logger.warning("""
+          GoodJob concurrency_key limits are deprecated toward Ruby GoodJob v5 / Elixir 2.0. \
+          Prefer labels: set job labels and concurrency_config: [label: "...", perform_limit: n]. \
+          See COMPATIBILITY.md.
+          """)
+      end
     else
-      job_id not in allowed_active_job_ids
+      :ok
     end
   end
 end

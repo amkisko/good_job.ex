@@ -111,6 +111,7 @@ defmodule GoodJob.Job do
   def changeset(job, attrs) do
     job
     |> cast(attrs, [
+      :id,
       :queue_name,
       :priority,
       :serialized_params,
@@ -142,7 +143,24 @@ defmodule GoodJob.Job do
   """
   def build_for_enqueue(attrs) do
     %__MODULE__{}
-    |> changeset(attrs)
+    |> changeset(align_id_with_active_job_id(attrs))
+  end
+
+  # Ruby GoodJob sets good_jobs.id = active_job_id on create so claims and
+  # ActiveJob job_id share one UUID. Match that for shared-database protocol.
+  defp align_id_with_active_job_id(attrs) when is_map(attrs) do
+    active_job_id = Map.get(attrs, :active_job_id) || Map.get(attrs, "active_job_id")
+
+    cond do
+      is_nil(active_job_id) ->
+        attrs
+
+      Map.has_key?(attrs, :id) or Map.has_key?(attrs, "id") ->
+        attrs
+
+      true ->
+        Map.put(attrs, :id, active_job_id)
+    end
   end
 
   @doc """
@@ -161,7 +179,7 @@ defmodule GoodJob.Job do
     repo = GoodJob.Repo.repo()
 
     case %__MODULE__{}
-         |> changeset(attrs)
+         |> changeset(align_id_with_active_job_id(attrs))
          |> repo.insert() do
       {:ok, job} = result ->
         # Emit events for UI updates (PubSub) and observability (Telemetry)

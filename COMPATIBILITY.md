@@ -12,9 +12,23 @@ This allows you to:
 
 Both implementations share the same Protocol tables and columns (`good_jobs`, `good_job_processes`, `good_job_executions`, batches, settings).
 
-Indexes are intended to match Ruby GoodJob 4.x. Elixir ships additive migrations (`add_good_job_parity_indexes`, `add_index_good_jobs_discarded_job_class`) for indexes that older Elixir installs may lack. Shared databases that already ran Ruby's update migrations are fine: new indexes use `IF NOT EXISTS`.
+Indexes and tables are intended to match Ruby GoodJob 4.24.x. Elixir ships additive migrations (`add_good_job_parity_indexes`, `add_index_good_jobs_discarded_job_class`, `add_good_job_ruby_4_24_schema_parity`) for indexes and the `good_job_concurrency_claims` table that older Elixir installs may lack. Shared databases that already ran Ruby's update migrations are fine: new objects use `IF NOT EXISTS`.
 
-Priority ordering for dequeue is ascending (smaller priority first), matching Ruby GoodJob v4.
+Priority ordering for dequeue is ascending (smaller priority first), matching Ruby GoodJob v4. Queue-scoped dequeue indexes (`index_good_jobs_dequeue_by_queue*`) match Ruby update migration 16.
+
+Ruby GoodJob v5 will remove `good_jobs.concurrency_key` and require label-based concurrency. Elixir still stores and honors `concurrency_key` for shared-database compatibility, and logs a one-time deprecation warning when key-only limits are used.
+
+Prefer labels now:
+
+```elixir
+use GoodJob.Job
+
+def good_job_concurrency_config do
+  [label: "user-sync", total_limit: 1]
+end
+```
+
+Jobs get that label on enqueue. Perform limits use `good_job_concurrency_claims` (grant/wait/promote) when the table exists, matching Ruby 4.21+. `good_jobs.id` is aligned with `active_job_id` on create, matching Ruby's discrete job identity for claims.
 
 ## Retry & Error Logic Compatibility ✅
 
@@ -131,6 +145,21 @@ def backoff(attempt), do: GoodJob.Backoff.polynomial(attempt)
 - Elixir GoodJob defaults `:advisory_lock_function` to `:pg_try_advisory_xact_lock` (transaction-scoped) for transactional claim and concurrency checks.
 - Session locks are still used for process heartbeat and `:hybrid` dequeue SQL.
 - Do not flip the Elixir default casually when sharing a database; configure `:advisory_lock_function` / `GOOD_JOB_ADVISORY_LOCK_FUNCTION` if you need session locks on the Elixir side.
+
+## Lock strategy rolling migrate (toward Ruby v5)
+
+Elixir default remains `:advisory`. Ruby GoodJob v5 is expected to default to `:skiplocked`. To move a shared database safely:
+
+1. Deploy all workers on `:hybrid` (sees both advisory and row locks).
+2. Wait until no `:advisory`-only workers remain.
+3. Deploy `:skiplocked` and disable LISTEN/NOTIFY if using PgBouncer transaction mode (`enable_listen_notify: false`, rely on `poll_interval`).
+
+Do not run `:advisory` and `:skiplocked` workers against the same database at the same time.
+
+## Dequeue sort and threads naming
+
+- `:dequeue_query_sort` — `:created_at` (default) or `:scheduled_at` (Ruby v5 direction). Env: `GOOD_JOB_DEQUEUE_QUERY_SORT`.
+- `:threads` — preferred alias for `:max_processes` (Ruby renamed `max_threads` → `threads`). Env: `GOOD_JOB_THREADS`.
 
 ## Best Practices
 

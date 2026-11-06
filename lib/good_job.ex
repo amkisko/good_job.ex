@@ -77,13 +77,26 @@ defmodule GoodJob do
     batch_callback_id = Keyword.get(opts, :batch_callback_id)
     concurrency_key = Keyword.get(opts, :concurrency_key)
     tags = Keyword.get(opts, :tags, get_default_tags(callback_module))
+    config = get_concurrency_config(job_module, opts)
+    concurrency_label = Keyword.get(config, :label)
+
+    tags =
+      if is_binary(concurrency_label) and concurrency_label != "" and concurrency_label not in tags do
+        tags ++ [concurrency_label]
+      else
+        tags
+      end
 
     concurrency_result =
-      if concurrency_key do
-        config = get_concurrency_config(job_module, opts)
-        enqueue_concurrency_with_retry(concurrency_key, config, 5)
-      else
-        :ok
+      cond do
+        is_binary(concurrency_label) and concurrency_label != "" ->
+          enqueue_concurrency_label_with_retry(concurrency_label, config, 5)
+
+        is_binary(concurrency_key) and concurrency_key != "" ->
+          enqueue_concurrency_with_retry(concurrency_key, config, 5)
+
+        true ->
+          :ok
       end
 
     case concurrency_result do
@@ -214,6 +227,26 @@ defmodule GoodJob do
 
   defp after_enqueue(nil, _job, _opts), do: :ok
   defp after_enqueue(job_module, job, opts), do: GoodJob.JobCallbacks.after_enqueue(job_module, job, opts)
+
+  defp enqueue_concurrency_label_with_retry(label, config, attempts) do
+    case GoodJob.Concurrency.check_enqueue_limit_for_label(label, config) do
+      {:ok, :ok} ->
+        :ok
+
+      {:ok, {:error, :lock_failed}} when attempts > 1 ->
+        Process.sleep(10)
+        enqueue_concurrency_label_with_retry(label, config, attempts - 1)
+
+      {:ok, {:error, :lock_failed}} ->
+        {:error, :lock_failed}
+
+      {:ok, {:error, reason}} ->
+        {:error, reason}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
 
   defp enqueue_concurrency_with_retry(concurrency_key, config, attempts) do
     case GoodJob.Concurrency.check_enqueue_limit(concurrency_key, config) do

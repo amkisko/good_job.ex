@@ -3,7 +3,7 @@ defmodule GoodJob.JobRecovery do
 
   import Ecto.Query
 
-  alias GoodJob.{Execution, Job, Repo}
+  alias GoodJob.{ConcurrencyClaim, Execution, Job, Repo}
 
   @doc """
   Releases a job after the worker task died (e.g. `:DOWN` from `Task.Supervisor`).
@@ -35,6 +35,14 @@ defmodule GoodJob.JobRecovery do
 
       :ok
     end)
+
+    if ConcurrencyClaim.table_exists?() do
+      ConcurrencyClaim.release_job(job.id)
+
+      if is_binary(job.locked_by_id) do
+        ConcurrencyClaim.release_process(job.locked_by_id)
+      end
+    end
 
     :ok
   end

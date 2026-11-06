@@ -210,7 +210,6 @@ defmodule Mix.Tasks.GoodJob.Install do
         use Ecto.Migration
 
         def up do
-          # Create good_jobs table
           create table(:good_jobs, primary_key: false) do
             add :id, :uuid, primary_key: true, default: fragment("gen_random_uuid()")
             add :queue_name, :text
@@ -220,10 +219,6 @@ defmodule Mix.Tasks.GoodJob.Install do
             add :performed_at, :utc_datetime_usec
             add :finished_at, :utc_datetime_usec
             add :error, :text
-
-            add :created_at, :utc_datetime_usec, null: false
-            add :updated_at, :utc_datetime_usec, null: false
-
             add :active_job_id, :uuid
             add :concurrency_key, :text
             add :cron_key, :text
@@ -238,9 +233,12 @@ defmodule Mix.Tasks.GoodJob.Install do
             add :labels, {:array, :text}
             add :locked_by_id, :uuid
             add :locked_at, :utc_datetime_usec
+            add :lock_type, :smallint
+
+            add :created_at, :utc_datetime_usec, null: false
+            add :updated_at, :utc_datetime_usec, null: false
           end
 
-          # Create good_job_batches table
           create table(:good_job_batches, primary_key: false) do
             add :id, :uuid, primary_key: true, default: fragment("gen_random_uuid()")
             add :description, :text
@@ -259,7 +257,6 @@ defmodule Mix.Tasks.GoodJob.Install do
             add :updated_at, :utc_datetime_usec, null: false
           end
 
-          # Create good_job_executions table
           create table(:good_job_executions, primary_key: false) do
             add :id, :uuid, primary_key: true, default: fragment("gen_random_uuid()")
             add :active_job_id, :uuid, null: false
@@ -278,7 +275,6 @@ defmodule Mix.Tasks.GoodJob.Install do
             add :updated_at, :utc_datetime_usec, null: false
           end
 
-          # Create good_job_processes table
           create table(:good_job_processes, primary_key: false) do
             add :id, :uuid, primary_key: true, default: fragment("gen_random_uuid()")
             add :state, :jsonb
@@ -288,7 +284,6 @@ defmodule Mix.Tasks.GoodJob.Install do
             add :updated_at, :utc_datetime_usec, null: false
           end
 
-          # Create good_job_settings table
           create table(:good_job_settings, primary_key: false) do
             add :id, :uuid, primary_key: true, default: fragment("gen_random_uuid()")
             add :key, :text, null: false
@@ -298,15 +293,20 @@ defmodule Mix.Tasks.GoodJob.Install do
             add :updated_at, :utc_datetime_usec, null: false
           end
 
-          # Indexes for good_jobs
+          create table(:good_job_concurrency_claims, primary_key: false) do
+            add :id, :uuid, primary_key: true, default: fragment("gen_random_uuid()")
+            add :job_id, :uuid, null: false
+            add :locked_by_id, :uuid
+            add :state, :smallint, null: false
+            add :key, :text, null: false
+
+            add :created_at, :utc_datetime_usec, null: false
+            add :updated_at, :utc_datetime_usec, null: false
+          end
+
           create index(:good_jobs, [:scheduled_at],
             where: "finished_at IS NULL",
             name: :index_good_jobs_on_scheduled_at
-          )
-
-          create index(:good_jobs, [:queue_name, :scheduled_at],
-            where: "finished_at IS NULL",
-            name: :index_good_jobs_on_queue_name_and_scheduled_at
           )
 
           create index(:good_jobs, [:active_job_id, :created_at],
@@ -327,31 +327,22 @@ defmodule Mix.Tasks.GoodJob.Install do
             name: :index_good_jobs_on_cron_key_and_created_at_cond
           )
 
-          create index(:good_jobs, [:cron_key, :cron_at],
-            where: "cron_key IS NOT NULL",
-            unique: true,
-            name: :index_good_jobs_on_cron_key_and_cron_at_cond
-          )
+          execute(\"\"\"
+          CREATE UNIQUE INDEX index_good_jobs_on_cron_key_and_cron_at_cond
+          ON good_jobs (cron_key, cron_at DESC NULLS LAST)
+          WHERE cron_key IS NOT NULL
+          \"\"\")
 
           create index(:good_jobs, [:finished_at],
             where: "finished_at IS NOT NULL",
             name: :index_good_jobs_jobs_on_finished_at_only
           )
 
-          create index(:good_jobs, [:priority, :created_at],
-            where: "finished_at IS NULL",
-            name: :index_good_jobs_jobs_on_priority_created_at_when_unfinished
-          )
-
-          create index(:good_jobs, [:priority, :created_at],
-            where: "finished_at IS NULL",
-            name: :index_good_job_jobs_for_candidate_lookup
-          )
-
-          create index(:good_jobs, [:priority, :scheduled_at],
-            where: "finished_at IS NULL AND locked_by_id IS NULL",
-            name: :index_good_jobs_on_priority_scheduled_at_unfinished_unlocked
-          )
+          execute(\"\"\"
+          CREATE INDEX index_good_job_jobs_for_candidate_lookup
+          ON good_jobs (priority ASC NULLS LAST, created_at ASC)
+          WHERE finished_at IS NULL
+          \"\"\")
 
           create index(:good_jobs, [:batch_id],
             where: "batch_id IS NOT NULL"
@@ -361,13 +352,18 @@ defmodule Mix.Tasks.GoodJob.Install do
             where: "batch_callback_id IS NOT NULL"
           )
 
-          create index(:good_jobs, [:job_class],
-            name: :index_good_jobs_on_job_class
+          create index(:good_jobs, [:batch_id],
+            where: "batch_id IS NOT NULL AND finished_at IS NULL",
+            name: :index_good_jobs_on_batch_id_unfinished
           )
 
-          create index(:good_jobs, [:job_class, :finished_at],
-            where: "finished_at IS NOT NULL AND error IS NOT NULL",
-            name: :index_good_jobs_on_discarded_job_class
+          create index(:good_jobs, [:batch_callback_id],
+            where: "batch_callback_id IS NOT NULL AND finished_at IS NULL",
+            name: :index_good_jobs_on_batch_callback_id_unfinished
+          )
+
+          create index(:good_jobs, [:job_class],
+            name: :index_good_jobs_on_job_class
           )
 
           create index(:good_jobs, [:labels],
@@ -376,25 +372,109 @@ defmodule Mix.Tasks.GoodJob.Install do
             name: :index_good_jobs_on_labels
           )
 
+          create index(:good_job_executions, [:active_job_id, :created_at],
+            name: :index_good_job_executions_on_active_job_id_and_created_at
+          )
+
+          create index(:good_job_executions, [:scheduled_at],
+            name: :index_good_job_executions_on_scheduled_at
+          )
+
+          create index(:good_job_executions, [:created_at],
+            name: :index_good_job_executions_on_created_at
+          )
+
+          execute(\"\"\"
+          CREATE INDEX index_good_jobs_on_priority_scheduled_at_unfinished
+          ON good_jobs (priority ASC, scheduled_at ASC, id ASC)
+          WHERE finished_at IS NULL
+          \"\"\")
+
+          execute(\"\"\"
+          CREATE INDEX index_good_jobs_on_queue_name_priority_scheduled_at_unfinished
+          ON good_jobs (queue_name ASC, scheduled_at ASC, id ASC)
+          WHERE finished_at IS NULL
+          \"\"\")
+
           create index(:good_jobs, [:locked_by_id],
             where: "locked_by_id IS NOT NULL",
             name: :index_good_jobs_on_locked_by_id
-          )
-
-          # Indexes for good_job_executions
-          create index(:good_job_executions, [:active_job_id, :created_at],
-            name: :index_good_job_executions_on_active_job_id_and_created_at
           )
 
           create index(:good_job_executions, [:process_id, :created_at],
             name: :index_good_job_executions_on_process_id_and_created_at
           )
 
-          # Unique index for good_job_settings
+          create index(:good_job_batches, [:finished_at],
+            where: "finished_at IS NOT NULL",
+            name: :index_good_job_batches_on_finished_at
+          )
+
+          execute(\"\"\"
+          CREATE INDEX index_good_job_batches_on_created_at_and_id
+          ON good_job_batches (created_at DESC, id DESC)
+          \"\"\")
+
+          execute(\"\"\"
+          CREATE INDEX index_good_jobs_for_candidate_dequeue_unlocked
+          ON good_jobs (priority ASC NULLS LAST, scheduled_at ASC, id ASC)
+          WHERE finished_at IS NULL AND locked_by_id IS NULL
+          \"\"\")
+
+          execute(\"\"\"
+          CREATE INDEX index_good_jobs_dequeue_by_queue
+          ON good_jobs (queue_name, priority ASC NULLS LAST, created_at ASC)
+          WHERE finished_at IS NULL AND locked_by_id IS NULL
+          \"\"\")
+
+          execute(\"\"\"
+          CREATE INDEX index_good_jobs_dequeue_by_queue_scheduled_at
+          ON good_jobs (queue_name, priority ASC NULLS LAST, scheduled_at ASC)
+          WHERE finished_at IS NULL AND locked_by_id IS NULL
+          \"\"\")
+
+          create index(:good_jobs, [:queue_name], name: :index_good_jobs_on_queue_name)
+          create index(:good_jobs, [:created_at], name: :index_good_jobs_on_created_at)
+
+          execute(\"\"\"
+          CREATE INDEX index_good_jobs_on_discarded
+          ON good_jobs (finished_at DESC)
+          WHERE finished_at IS NOT NULL AND error IS NOT NULL
+          \"\"\")
+
+          execute(\"\"\"
+          CREATE INDEX index_good_jobs_on_discarded_job_class
+          ON good_jobs (job_class, finished_at)
+          WHERE finished_at IS NOT NULL AND error IS NOT NULL
+          \"\"\")
+
+          create index(:good_jobs, [:scheduled_at, :queue_name],
+            name: :index_good_jobs_on_scheduled_at_and_queue_name
+          )
+
+          execute(\"\"\"
+          CREATE INDEX index_good_jobs_on_unfinished_or_errored
+          ON good_jobs (id)
+          WHERE finished_at IS NULL OR error IS NOT NULL
+          \"\"\")
+
+          create unique_index(:good_job_concurrency_claims, [:key, :job_id])
+
+          create index(:good_job_concurrency_claims, [:key, :state, :created_at],
+            name: :index_good_job_concurrency_claims_for_promotion
+          )
+
+          create index(:good_job_concurrency_claims, [:job_id])
+
+          create index(:good_job_concurrency_claims, [:locked_by_id],
+            where: "locked_by_id IS NOT NULL"
+          )
+
           create unique_index(:good_job_settings, [:key])
         end
 
         def down do
+          drop table(:good_job_concurrency_claims)
           drop table(:good_job_settings)
           drop table(:good_job_processes)
           drop table(:good_job_executions)

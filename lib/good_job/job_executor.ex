@@ -54,37 +54,7 @@ defmodule GoodJob.JobExecutor do
     end
 
     try do
-      if job.concurrency_key do
-        config = get_concurrency_config(job)
-
-        case Concurrency.check_perform_limit(job.concurrency_key, job.active_job_id, config) do
-          {:ok, :ok} ->
-            :ok
-
-          {:ok, {:error, :limit_exceeded}} ->
-            raise %Errors.ConcurrencyExceededError{
-              message: "Concurrency limit exceeded for key: #{job.concurrency_key}",
-              concurrency_key: job.concurrency_key
-            }
-
-          {:ok, {:error, :throttle_exceeded}} ->
-            raise %Errors.ThrottleExceededError{
-              message: "Throttle limit exceeded for key: #{job.concurrency_key}",
-              concurrency_key: job.concurrency_key
-            }
-
-          {:ok, {:error, :lock_failed}} ->
-            raise %Errors.ConcurrencyLockFailedError{
-              message: "Concurrency advisory lock not acquired for key: #{job.concurrency_key}",
-              concurrency_key: job.concurrency_key
-            }
-
-          error ->
-            raise %Errors.ConfigurationError{
-              message: "Concurrency check failed: #{inspect(error)}"
-            }
-        end
-      end
+      enforce_concurrency!(job, lock_id)
 
       existing_performed_at = job.performed_at
 
@@ -320,6 +290,59 @@ defmodule GoodJob.JobExecutor do
   defp concurrency_error?(%Errors.ConcurrencyLockFailedError{}), do: true
   defp concurrency_error?(_), do: false
 
+  defp enforce_concurrency!(job, lock_id) do
+    config = get_concurrency_config(job)
+    label = concurrency_label(config, job)
+    opts = [job_id: job.id, locked_by_id: lock_id, concurrency_key: job.concurrency_key]
+
+    result =
+      cond do
+        is_binary(label) and label != "" ->
+          Concurrency.check_perform_limit_for_label(label, job.active_job_id, config, opts)
+
+        is_binary(job.concurrency_key) and job.concurrency_key != "" ->
+          Concurrency.check_perform_limit(job.concurrency_key, job.active_job_id, config, opts)
+
+        true ->
+          {:ok, :ok}
+      end
+
+    case result do
+      {:ok, :ok} ->
+        :ok
+
+      {:ok, {:error, :limit_exceeded}} ->
+        raise %Errors.ConcurrencyExceededError{
+          message: "Concurrency limit exceeded for #{inspect(label || job.concurrency_key)}",
+          concurrency_key: job.concurrency_key
+        }
+
+      {:ok, {:error, :throttle_exceeded}} ->
+        raise %Errors.ThrottleExceededError{
+          message: "Throttle limit exceeded for #{inspect(label || job.concurrency_key)}",
+          concurrency_key: job.concurrency_key
+        }
+
+      {:ok, {:error, :lock_failed}} ->
+        raise %Errors.ConcurrencyLockFailedError{
+          message: "Concurrency advisory lock not acquired for #{inspect(label || job.concurrency_key)}",
+          concurrency_key: job.concurrency_key
+        }
+
+      error ->
+        raise %Errors.ConfigurationError{
+          message: "Concurrency check failed: #{inspect(error)}"
+        }
+    end
+  end
+
+  defp concurrency_label(config, _job) do
+    case Keyword.get(config, :label) do
+      label when is_binary(label) and label != "" -> label
+      _ -> nil
+    end
+  end
+
   defp get_concurrency_config(job) do
     config_from_params = extract_concurrency_config_from_params(job.serialized_params)
     job_module = Deserializer.deserialize_job_module(job.job_class, job.serialized_params)
@@ -368,6 +391,8 @@ defmodule GoodJob.JobExecutor do
       {:perform_limit, v}, acc -> maybe_put_concurrency_int(acc, :perform_limit, v)
       {"total_limit", v}, acc -> maybe_put_concurrency_int(acc, :total_limit, v)
       {:total_limit, v}, acc -> maybe_put_concurrency_int(acc, :total_limit, v)
+      {"label", v}, acc when is_binary(v) -> Keyword.put(acc, :label, v)
+      {:label, v}, acc when is_binary(v) -> Keyword.put(acc, :label, v)
       _, acc -> acc
     end)
   end

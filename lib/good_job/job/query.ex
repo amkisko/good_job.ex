@@ -125,8 +125,9 @@ defmodule GoodJob.Job.Query do
   end
 
   @doc """
-  Orders jobs by priority and inserted_at for candidate lookup.
+  Orders jobs by priority then created_at or scheduled_at for candidate lookup.
 
+  Sort after priority comes from `GoodJob.Config.dequeue_query_sort/0`.
   If parsed_queues contains :ordered_queues, orders by queue order first.
   """
   def order_for_candidate_lookup(query \\ Job, parsed_queues \\ %{}) do
@@ -137,10 +138,7 @@ defmodule GoodJob.Job.Query do
         query
       end
 
-    order_by(query, [j],
-      asc_nulls_last: j.priority,
-      asc: j.inserted_at
-    )
+    apply_dequeue_sort(query)
   end
 
   @doc """
@@ -261,15 +259,30 @@ defmodule GoodJob.Job.Query do
   end
 
   @doc """
-  Orders jobs for dequeueing (priority ASC NULLS LAST, created_at ASC).
+  Orders jobs for dequeueing (priority ASC NULLS LAST, then configured secondary sort).
 
   Matches Ruby GoodJob v4 and `order_for_candidate_lookup/1`: smaller priority runs first.
   """
   def dequeueing_ordered(query \\ Job) do
-    order_by(query, [j],
-      asc_nulls_last: j.priority,
-      asc: j.inserted_at
-    )
+    apply_dequeue_sort(query)
+  end
+
+  defp apply_dequeue_sort(query) do
+    case GoodJob.Config.dequeue_query_sort() do
+      :scheduled_at ->
+        order_by(query, [j],
+          asc_nulls_last: j.priority,
+          asc_nulls_last: j.scheduled_at,
+          asc: j.id
+        )
+
+      :created_at ->
+        order_by(query, [j],
+          asc_nulls_last: j.priority,
+          asc: j.inserted_at,
+          asc: j.id
+        )
+    end
   end
 
   @doc """

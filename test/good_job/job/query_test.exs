@@ -385,6 +385,53 @@ defmodule GoodJob.Job.QueryTest do
 
       assert ordered_ids == [high_priority.id, low_priority.id]
     end
+
+    test "orders by scheduled_at when dequeue_query_sort is :scheduled_at" do
+      original_config = Application.get_env(:good_job, :config, %{})
+
+      on_exit(fn ->
+        Application.put_env(:good_job, :config, original_config)
+      end)
+
+      Application.put_env(
+        :good_job,
+        :config,
+        Map.put(Map.new(original_config), :dequeue_query_sort, :scheduled_at)
+      )
+
+      repo = Repo.repo()
+      later = DateTime.add(DateTime.utc_now(), 60, :second)
+      sooner = DateTime.add(DateTime.utc_now(), 10, :second)
+
+      {:ok, later_job} =
+        Job.enqueue(%{
+          active_job_id: Ecto.UUID.generate(),
+          job_class: "T",
+          queue_name: "default",
+          priority: 0,
+          scheduled_at: later,
+          serialized_params: %{"arguments" => []}
+        })
+
+      {:ok, sooner_job} =
+        Job.enqueue(%{
+          active_job_id: Ecto.UUID.generate(),
+          job_class: "T",
+          queue_name: "default",
+          priority: 0,
+          scheduled_at: sooner,
+          serialized_params: %{"arguments" => []}
+        })
+
+      ordered_ids =
+        Job
+        |> Job.unfinished()
+        |> Job.dequeueing_ordered()
+        |> select([j], j.id)
+        |> repo.all()
+
+      assert ordered_ids == [sooner_job.id, later_job.id]
+    end
   end
 
   describe "order_for_candidate_lookup/1" do
