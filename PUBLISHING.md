@@ -19,12 +19,14 @@ Before publishing, ensure:
 
 ## Publishing Steps
 
-### Option 1: Using the Release Script (Recommended)
+### Option 1: Using Make / the Release Script (Recommended)
 
 The release script automates the entire process:
 
 ```bash
-./usr/bin/release.exs
+make release
+# same as: elixir usr/bin/release.exs
+# see also: make help  (ci, bench, hex.build, …)
 ```
 
 This script will:
