@@ -5,13 +5,16 @@ Working example demonstrating cross-language job processing using GoodJob.
 ## Quick Start
 
 ```bash
-# Start all services
-./start.sh
+# Ruby 4.0.9+ (see .ruby-version), GoodJob gem ~> 4.24
+cd rails && bundle install && bundle exec rails db:prepare && cd ..
+cd elixir && mix deps.get && cd ..
 
-# Run migrations
-cd rails && bundle exec rails db:create db:migrate && cd ..
-cd elixir && mix ecto.create mix ecto.migrate && cd ..
+# Start all services (Rails + Ruby worker + Elixir worker + Elixir web)
+./start.sh
 ```
+
+`execution_mode: :external` means Elixir jobs need `mix run --no-halt` (Procfile `elixir_worker`).  
+`mix phx.server` alone serves HTTP and does **not** run the Elixir worker.
 
 Access:
 - Rails: http://localhost:3000

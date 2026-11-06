@@ -2,8 +2,8 @@
 
 ## Prerequisites
 
-- Ruby 3.2+
-- Rails 8.0+
+- Ruby 4.0+ (see `.ruby-version`)
+- Rails 8.1+
 - Elixir 1.18+
 - PostgreSQL 14+
 - Docker & Docker Compose (optional, for containerized setup)

@@ -52,7 +52,8 @@ nested_globalid = %{
     "executions" => 0
   })
 
-nested_user = List.first(deserialized_nested) |> Map.get("user")
+nested_map = List.first(deserialized_nested)
+nested_user = Map.get(nested_map, :user) || Map.get(nested_map, "user")
 
 case nested_user do
   %{__struct__: :global_id, app: app, model: model, id: id, gid: gid} ->
@@ -65,6 +66,7 @@ case nested_user do
   other ->
     IO.puts("✗ Nested GlobalID deserialization failed")
     IO.puts("  Got: #{inspect(other)}")
+    IO.puts("  Map: #{inspect(nested_map)}")
 end
 
 # Test 3: Test invalid GlobalID format

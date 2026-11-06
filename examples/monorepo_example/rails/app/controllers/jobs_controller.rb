@@ -1,4 +1,7 @@
 class JobsController < ApplicationController
+  # Allow JSON/API clients (curl, scripts) without CSRF session token.
+  skip_forgery_protection only: :enqueue, if: -> { request.format.json? }
+
   def enqueue
     job_type = params[:job_type] || "example"
     
@@ -8,7 +11,8 @@ class JobsController < ApplicationController
     when "elixir"
       job = ElixirProcessedJob.perform_later(
         user_id: params[:user_id] || 123,
-        action: params[:action] || "process"
+        # Avoid params[:action] — that is the Rails controller action name.
+        action: params[:job_action] || params[:message] || "process"
       )
     when "zig"
       job = ZigProcessedJob.perform_later(

@@ -19,12 +19,23 @@ defmodule MonorepoExample.Application do
         []
       end
 
-    web_children = [
-      # Start PubSub for LiveView
-      {Phoenix.PubSub, name: MonorepoExample.PubSub},
-      # Start Phoenix Endpoint
-      MonorepoExampleWeb.Endpoint
-    ]
+    # PubSub is shared; Endpoint only when serving HTTP (mix phx.server / PHX_SERVER=true).
+    # This lets Procfile run elixir_worker (mix run --no-halt) and elixir_web (mix phx.server)
+    # without binding port 4000 twice. With execution_mode :external, GoodJob starts in the
+    # worker process and stays out of the web process.
+    serve_web? =
+      Application.get_env(:phoenix, :serve_endpoints, false) ||
+        System.get_env("PHX_SERVER") in ["1", "true", "TRUE"]
+
+    web_children =
+      [
+        {Phoenix.PubSub, name: MonorepoExample.PubSub}
+      ] ++
+        if serve_web? do
+          [MonorepoExampleWeb.Endpoint]
+        else
+          []
+        end
 
     children = base_children ++ good_job_children ++ web_children
 
