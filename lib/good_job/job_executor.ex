@@ -83,7 +83,8 @@ defmodule GoodJob.JobExecutor do
 
       {:ok, {execution, fresh_job}} =
         repo.transaction(fn ->
-          fresh_job = repo.get!(Job, job.id)
+          # Claimed job is already locked by this worker; avoid an extra SELECT.
+          fresh_job = job
           normalized_process_id = normalize_process_id(process_id)
 
           execution_attrs = %{

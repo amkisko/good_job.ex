@@ -61,6 +61,14 @@ defmodule GoodJob.ConfigTest do
     end
   end
 
+  describe "poll_interval_ms/0" do
+    test "never returns a negative send_after delay" do
+      ms = Config.poll_interval_ms()
+      assert is_integer(ms)
+      assert ms >= 0
+    end
+  end
+
   describe "max_cache/0" do
     test "returns max cache size" do
       cache = Config.max_cache()

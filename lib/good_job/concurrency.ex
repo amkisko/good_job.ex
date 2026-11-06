@@ -104,7 +104,18 @@ defmodule GoodJob.Concurrency do
     has_perform_limit = not is_nil(config[:perform_limit])
 
     cond do
-      limit && perform_limit_exceeded?(scope, limit, type, repo, active_job_id, has_enqueue_limit, has_perform_limit, config, opts) ->
+      limit &&
+          perform_limit_exceeded?(
+            scope,
+            limit,
+            type,
+            repo,
+            active_job_id,
+            has_enqueue_limit,
+            has_perform_limit,
+            config,
+            opts
+          ) ->
         GoodJob.Telemetry.concurrency_limit_exceeded(scope_name(config, opts), limit, type)
         {:error, :limit_exceeded}
 
@@ -117,7 +128,17 @@ defmodule GoodJob.Concurrency do
     end
   end
 
-  defp perform_limit_exceeded?(scope, limit, :enqueue, repo, _active_job_id, has_enqueue_limit, _has_perform_limit, _config, _opts) do
+  defp perform_limit_exceeded?(
+         scope,
+         limit,
+         :enqueue,
+         repo,
+         _active_job_id,
+         has_enqueue_limit,
+         _has_perform_limit,
+         _config,
+         _opts
+       ) do
     count =
       if has_enqueue_limit do
         scope
@@ -132,13 +153,24 @@ defmodule GoodJob.Concurrency do
     count + 1 > limit
   end
 
-  defp perform_limit_exceeded?(scope, limit, :perform, repo, active_job_id, _has_enqueue_limit, has_perform_limit, config, opts) do
+  defp perform_limit_exceeded?(
+         scope,
+         limit,
+         :perform,
+         repo,
+         active_job_id,
+         _has_enqueue_limit,
+         has_perform_limit,
+         config,
+         opts
+       ) do
     job_row_id = Keyword.get(opts, :job_id)
     locked_by_id = Keyword.get(opts, :locked_by_id)
 
     cond do
       is_binary(job_row_id) and ConcurrencyClaim.table_exists?() ->
         claim_key = claim_key(config, opts)
+
         not ConcurrencyClaim.claim(
           key: claim_key,
           limit: limit,

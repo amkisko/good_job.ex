@@ -101,41 +101,15 @@ defmodule GoodJob.Scheduler do
     if state.shutdown do
       {:noreply, state}
     else
-      if map_size(state.running_tasks) < state.max_processes do
-        case JobPerformer.perform_next(state.queue_string, state.lock_id) do
-          {:ok, nil} ->
-            schedule_poll(Config.poll_interval() * 1000)
-            {:noreply, state}
+      case fill_available_slots(state) do
+        {:ok, new_state} ->
+          schedule_poll(Config.poll_interval_ms())
+          {:noreply, new_state}
 
-          {:ok, job} ->
-            GoodJob.IdleTracker.touch_execution()
-
-            task =
-              Task.Supervisor.async_nolink(state.task_supervisor, fn ->
-                case GoodJob.JobExecutor.execute(job, state.lock_id) do
-                  {:ok, result} -> {:ok, result}
-                  {:error, error} -> {:error, error}
-                end
-              end)
-
-            running_tasks = Map.put(state.running_tasks, task.ref, {task, job})
-
-            if map_size(running_tasks) < state.max_processes do
-              schedule_poll(0)
-            else
-              schedule_poll(Config.poll_interval() * 1000)
-            end
-
-            {:noreply, %{state | running_tasks: running_tasks}}
-
-          {:error, error} ->
-            Logger.error("Error performing job: #{inspect(error)}")
-            schedule_poll(Config.poll_interval() * 1000)
-            {:noreply, state}
-        end
-      else
-        schedule_poll(Config.poll_interval() * 1000)
-        {:noreply, state}
+        {:error, error, new_state} ->
+          Logger.error("Error performing job: #{inspect(error)}")
+          schedule_poll(Config.poll_interval_ms())
+          {:noreply, new_state}
       end
     end
   end
@@ -158,11 +132,17 @@ defmodule GoodJob.Scheduler do
             %{state | cleanup_tracker: cleanup_tracker}
           end
 
-        if map_size(running_tasks) < state.max_processes do
-          schedule_poll(0)
-        end
+        state = %{state | running_tasks: running_tasks}
 
-        {:noreply, %{state | running_tasks: running_tasks}}
+        case fill_available_slots(state) do
+          {:ok, new_state} ->
+            {:noreply, new_state}
+
+          {:error, error, new_state} ->
+            Logger.error("Error performing job: #{inspect(error)}")
+            schedule_poll(Config.poll_interval_ms())
+            {:noreply, new_state}
+        end
     end
   end
 
@@ -178,12 +158,17 @@ defmodule GoodJob.Scheduler do
         end
 
         handle_job_error(job, reason)
+        state = %{state | running_tasks: running_tasks}
 
-        if map_size(running_tasks) < state.max_processes do
-          schedule_poll(0)
+        case fill_available_slots(state) do
+          {:ok, new_state} ->
+            {:noreply, new_state}
+
+          {:error, error, new_state} ->
+            Logger.error("Error performing job: #{inspect(error)}")
+            schedule_poll(Config.poll_interval_ms())
+            {:noreply, new_state}
         end
-
-        {:noreply, %{state | running_tasks: running_tasks}}
     end
   end
 
@@ -292,6 +277,48 @@ defmodule GoodJob.Scheduler do
   catch
     :exit, _ ->
       :error
+  end
+
+  # Claim and start jobs until the pool is full or the queue is empty.
+  # :skiplocked / :hybrid take free slots in one multi-row claim when possible.
+  defp fill_available_slots(state) do
+    free = state.max_processes - map_size(state.running_tasks)
+
+    if free <= 0 do
+      {:ok, state}
+    else
+      case JobPerformer.perform_next_batch(state.queue_string, state.lock_id, free) do
+        {:ok, []} ->
+          {:ok, state}
+
+        {:ok, jobs} ->
+          new_state = Enum.reduce(jobs, state, &start_claimed_job/2)
+
+          # Advisory claims one job per batch call; keep filling while slots remain.
+          if Config.lock_strategy() == :advisory and map_size(new_state.running_tasks) < new_state.max_processes do
+            fill_available_slots(new_state)
+          else
+            {:ok, new_state}
+          end
+
+        {:error, error} ->
+          {:error, error, state}
+      end
+    end
+  end
+
+  defp start_claimed_job(job, state) do
+    GoodJob.IdleTracker.touch_execution()
+
+    task =
+      Task.Supervisor.async_nolink(state.task_supervisor, fn ->
+        case GoodJob.JobExecutor.execute(job, state.lock_id) do
+          {:ok, result} -> {:ok, result}
+          {:error, error} -> {:error, error}
+        end
+      end)
+
+    %{state | running_tasks: Map.put(state.running_tasks, task.ref, {task, job})}
   end
 
   defp schedule_poll(delay \\ 0) do

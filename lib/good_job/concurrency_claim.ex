@@ -132,9 +132,7 @@ defmodule GoodJob.ConcurrencyClaim do
       )
 
     if keys != [] do
-      repo.delete_all(
-        from(c in __MODULE__, where: c.state == ^@granted and c.locked_by_id == ^locked_by_id)
-      )
+      repo.delete_all(from(c in __MODULE__, where: c.state == ^@granted and c.locked_by_id == ^locked_by_id))
 
       Enum.each(keys, &promote_next/1)
     end

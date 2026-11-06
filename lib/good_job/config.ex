@@ -569,6 +569,20 @@ defmodule GoodJob.Config do
   end
 
   @doc """
+  Returns the poll delay in milliseconds for `Process.send_after/3`.
+
+  Negative `poll_interval/0` means continuous polling. That maps to a short
+  positive delay (`100`) so empty queues do not busy-loop `send_after(0)`.
+  """
+  @spec poll_interval_ms() :: non_neg_integer()
+  def poll_interval_ms do
+    case poll_interval() do
+      interval when is_integer(interval) and interval < 0 -> 100
+      interval when is_integer(interval) -> interval * 1000
+    end
+  end
+
+  @doc """
   Returns the external job class name to Elixir module mapping.
 
   This map allows you to explicitly configure which Elixir module should handle

@@ -38,25 +38,16 @@ defmodule GoodJob.PubSub do
              :job_cancelled,
              :job_snoozed
            ] do
-    # Check if Phoenix.PubSub is available
-    case Code.ensure_loaded(Phoenix.PubSub) do
-      {:module, _} ->
-        # Try to get PubSub from application config
-        pubsub_server = get_pubsub_server()
-
-        if pubsub_server do
-          Phoenix.PubSub.broadcast(
-            pubsub_server,
-            @topic,
-            {event, job_id}
-          )
-        else
+    if phoenix_pubsub_loaded?() do
+      case get_pubsub_server() do
+        nil ->
           :noop
-        end
 
-      {:error, _} ->
-        # Phoenix not available - gracefully no-op
-        :noop
+        pubsub_server ->
+          Phoenix.PubSub.broadcast(pubsub_server, @topic, {event, job_id})
+      end
+    else
+      :noop
     end
   end
 
@@ -69,21 +60,31 @@ defmodule GoodJob.PubSub do
   Returns the topic name for use in LiveView subscriptions, or `nil` if Phoenix is not available.
   """
   def subscribe(pubsub_server \\ nil) do
-    # Check if Phoenix.PubSub is available
-    case Code.ensure_loaded(Phoenix.PubSub) do
-      {:module, _} ->
-        server = pubsub_server || get_pubsub_server()
+    if phoenix_pubsub_loaded?() do
+      server = pubsub_server || get_pubsub_server()
 
-        if server do
-          Phoenix.PubSub.subscribe(server, @topic)
-          @topic
-        else
-          nil
-        end
-
-      {:error, _} ->
-        # Phoenix not available - gracefully return nil
+      if server do
+        Phoenix.PubSub.subscribe(server, @topic)
+        @topic
+      else
         nil
+      end
+    else
+      nil
+    end
+  end
+
+  defp phoenix_pubsub_loaded? do
+    case :persistent_term.get({__MODULE__, :phoenix_pubsub?}, :unset) do
+      :unset ->
+        loaded? =
+          match?({:module, _}, Code.ensure_loaded(Phoenix.PubSub))
+
+        :persistent_term.put({__MODULE__, :phoenix_pubsub?}, loaded?)
+        loaded?
+
+      loaded? ->
+        loaded?
     end
   end
 

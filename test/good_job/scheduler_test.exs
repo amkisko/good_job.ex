@@ -175,7 +175,8 @@ defmodule GoodJob.SchedulerTest do
 
     {:noreply, state} = Scheduler.handle_info(:poll, state)
     assert map_size(state.running_tasks) == 1
-    assert_receive :poll, 500
+    # No more queued work: next poll uses configured interval (not send_after(0)).
+    assert_receive :poll, 1500
 
     {ref, result} =
       receive do
@@ -186,7 +187,24 @@ defmodule GoodJob.SchedulerTest do
 
     assert {:noreply, state} = Scheduler.handle_info({ref, result}, state)
     assert map_size(state.running_tasks) == 0
-    assert_receive :poll, 500
+
+    if Process.alive?(task_supervisor) do
+      Supervisor.stop(task_supervisor, :normal, 1000)
+    end
+  end
+
+  test "poll fills multiple free slots in one poll" do
+    Application.put_env(:good_job, :config, %{repo: GoodJob.TestRepo, poll_interval: 1})
+
+    {:ok, task_supervisor} = Task.Supervisor.start_link()
+    _j1 = insert_test_job(%{queue_name: "batch"})
+    _j2 = insert_test_job(%{queue_name: "batch"})
+
+    state = base_state(%{queue_string: "batch", max_processes: 2, task_supervisor: task_supervisor})
+
+    {:noreply, state} = Scheduler.handle_info(:poll, state)
+    assert map_size(state.running_tasks) == 2
+    assert_receive :poll, 1500
 
     if Process.alive?(task_supervisor) do
       Supervisor.stop(task_supervisor, :normal, 1000)

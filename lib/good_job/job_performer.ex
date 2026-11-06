@@ -12,7 +12,7 @@ defmodule GoodJob.JobPerformer do
   alias GoodJob.{Job, Repo}
   import Ecto.Query
 
-  @stale_lock_sweep_every 10
+  @stale_lock_sweep_every 50
 
   @doc """
   Performs the next eligible job.
@@ -20,6 +20,20 @@ defmodule GoodJob.JobPerformer do
   Returns `{:ok, result}` if a job was executed, `{:ok, nil}` if no job was found.
   """
   def perform_next(queue_string, lock_id, opts \\ []) do
+    case perform_next_batch(queue_string, lock_id, 1, opts) do
+      {:ok, []} -> {:ok, nil}
+      {:ok, [job | _]} -> {:ok, job}
+      {:error, error} -> {:error, error}
+    end
+  end
+
+  @doc """
+  Claims up to `limit` eligible jobs for the queue.
+
+  `:skiplocked` / `:hybrid` use one multi-row `SKIP LOCKED` update.
+  `:advisory` still claims at most one job per call.
+  """
+  def perform_next_batch(queue_string, lock_id, limit, opts \\ []) when is_integer(limit) and limit > 0 do
     queue_select_limit =
       Keyword.get(opts, :queue_select_limit) ||
         GoodJob.Config.queue_select_limit() ||
@@ -38,49 +52,52 @@ defmodule GoodJob.JobPerformer do
                       queue_select_limit: queue_select_limit
                     ) do
                  nil ->
-                   nil
+                   []
 
                  job ->
                    now = DateTime.utc_now()
 
-                   job
-                   |> Job.changeset(%{
-                     locked_by_id: lock_id,
-                     locked_at: now,
-                     performed_at: now,
-                     lock_type: nil
-                   })
-                   |> repo.update!()
-                   |> then(&repo.get!(Job, &1.id))
+                   [
+                     job
+                     |> Job.changeset(%{
+                       locked_by_id: lock_id,
+                       locked_at: now,
+                       performed_at: now,
+                       lock_type: nil
+                     })
+                     |> repo.update!()
+                   ]
                end
              end) do
-          {:ok, nil} ->
+          {:ok, []} ->
             GoodJob.Telemetry.scheduler_job_not_found(queue_string)
-            {:ok, nil}
+            {:ok, []}
 
-          {:ok, job} ->
-            GoodJob.Telemetry.scheduler_job_fetched(job, queue_string)
-            GoodJob.Telemetry.job_locked(job, lock_id)
-            GoodJob.PubSub.broadcast(:job_updated, job.id)
-            {:ok, job}
+          {:ok, jobs} ->
+            Enum.each(jobs, &emit_claim_telemetry(&1, queue_string, lock_id))
+            {:ok, jobs}
 
           {:error, error} ->
             {:error, error}
         end
 
       other when other in [:skiplocked, :hybrid] ->
-        case GoodJob.Job.Claim.claim_next(repo, parsed_queues, lock_id, other, []) do
-          nil ->
-            GoodJob.Telemetry.scheduler_job_not_found(queue_string)
-            {:ok, nil}
+        jobs = GoodJob.Job.Claim.claim_many(repo, parsed_queues, lock_id, other, limit, [])
 
-          job ->
-            GoodJob.Telemetry.scheduler_job_fetched(job, queue_string)
-            GoodJob.Telemetry.job_locked(job, lock_id)
-            GoodJob.PubSub.broadcast(:job_updated, job.id)
-            {:ok, job}
+        if jobs == [] do
+          GoodJob.Telemetry.scheduler_job_not_found(queue_string)
+        else
+          Enum.each(jobs, &emit_claim_telemetry(&1, queue_string, lock_id))
         end
+
+        {:ok, jobs}
     end
+  end
+
+  defp emit_claim_telemetry(job, queue_string, lock_id) do
+    GoodJob.Telemetry.scheduler_job_fetched(job, queue_string)
+    GoodJob.Telemetry.job_locked(job, lock_id)
+    GoodJob.PubSub.broadcast(:job_updated, job.id)
   end
 
   @doc false

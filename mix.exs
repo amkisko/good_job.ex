@@ -1,7 +1,7 @@
 defmodule GoodJob.MixProject do
   use Mix.Project
 
-  @version "1.0.1"
+  @version "1.1.0"
   @source_url "https://github.com/amkisko/good_job.ex"
 
   def project do
@@ -198,6 +198,7 @@ defmodule GoodJob.MixProject do
       ],
       "test.setup": ["ecto.create -r GoodJob.TestRepo --quiet", "ecto.migrate -r GoodJob.TestRepo --quiet"],
       "test.reset": ["ecto.drop -r GoodJob.TestRepo --quiet", "test.setup"],
+      "bench.load": ["run benchmarks/load.exs"],
       release: fn _ -> run_script("usr/bin/release.exs") end,
       analyze: fn _ -> run_script("usr/bin/analyze.exs") end
     ]

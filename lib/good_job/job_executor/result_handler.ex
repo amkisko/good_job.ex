@@ -179,7 +179,13 @@ defmodule GoodJob.JobExecutor.ResultHandler do
       finish_concurrency_claims(job.id)
       :ok
     else
-      repo.delete(job)
+      # Drop job and its execution rows together so high-throughput drains do not
+      # leave orphaned good_job_executions growth when preserve_job_records is false.
+      repo.transaction(fn ->
+        repo.delete_all(from(e in Execution, where: e.active_job_id == ^job.active_job_id))
+        repo.delete!(job)
+      end)
+
       finish_concurrency_claims(job.id)
       :ok
     end

@@ -253,6 +253,24 @@ jobs = [
 {:ok, _inserted} = GoodJob.Bulk.enqueue(jobs)
 ```
 
+## High throughput
+
+Elixir still defaults to `:advisory` locking for shared-database compatibility. For a dedicated high-volume queue:
+
+```elixir
+config :good_job,
+  lock_strategy: :skiplocked,
+  threads: 16,
+  preserve_job_records: false
+
+# Producers: prefer Bulk for bursts
+GoodJob.Bulk.enqueue(fn ->
+  Enum.each(payloads, &MyApp.WorkJob.perform_later/1)
+end)
+```
+
+Keep `threads` bounded (about 8–16 per pool on one primary). Prefer `GoodJob.Bulk` over per-job inserts. See [COMPATIBILITY.md](COMPATIBILITY.md) for the full recipe and rolling migrate notes.
+
 ## Queue Configuration
 
 ```elixir

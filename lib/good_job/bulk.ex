@@ -8,10 +8,12 @@ defmodule GoodJob.Bulk do
   - `enqueue/1` also accepts a list of `%GoodJob.Job.Instance{}`.
   """
 
+  alias GoodJob.Job
   alias GoodJob.Job.Instance
   alias GoodJob.Repo
 
   @buffer_key {__MODULE__, :current_buffer}
+  @insert_chunk_size 500
 
   @type entry :: %{
           required(:job_attrs) => map(),
@@ -101,30 +103,80 @@ defmodule GoodJob.Bulk do
 
   defp flush(entries) do
     repo = Repo.repo()
+    now = DateTime.utc_now() |> DateTime.truncate(:microsecond)
 
-    repo.transaction(fn ->
-      Enum.reduce_while(entries, [], fn entry, acc ->
-        case GoodJob.Job.enqueue(entry.job_attrs, listen_notify: false) do
-          {:ok, job} ->
-            if is_atom(entry.callback_module) do
-              GoodJob.JobCallbacks.after_enqueue(entry.callback_module, job, entry.opts)
-            end
+    try do
+      jobs =
+        entries
+        |> Enum.chunk_every(@insert_chunk_size)
+        |> Enum.flat_map(fn chunk ->
+          rows = Enum.map(chunk, &entry_to_insert_row(&1, now))
+          {_count, returned} = repo.insert_all(Job, rows, returning: true)
+          Enum.zip(chunk, returned)
+        end)
+        |> Enum.map(fn {entry, job} ->
+          GoodJob.PubSub.broadcast(:job_created, job.id)
+          GoodJob.Telemetry.enqueue(job)
 
-            {:cont, [job | acc]}
+          if is_atom(entry.callback_module) do
+            GoodJob.JobCallbacks.after_enqueue(entry.callback_module, job, entry.opts)
+          end
 
-          {:error, reason} ->
-            repo.rollback(reason)
-        end
-      end)
-      |> Enum.reverse()
-    end)
-    |> case do
-      {:ok, jobs} ->
-        notify_after_bulk_flush(jobs)
-        {:ok, jobs}
+          job
+        end)
 
-      {:error, reason} ->
-        {:error, reason}
+      notify_after_bulk_flush(jobs)
+      {:ok, jobs}
+    rescue
+      error ->
+        {:error, error}
+    end
+  end
+
+  defp entry_to_insert_row(%{job_attrs: attrs}, now) do
+    attrs =
+      attrs
+      |> stringify_or_atom_map()
+      |> align_id_with_active_job_id()
+
+    id = Map.get(attrs, :id) || Map.get(attrs, "id") || Ecto.UUID.generate()
+    active_job_id = Map.get(attrs, :active_job_id) || Map.get(attrs, "active_job_id") || id
+
+    %{
+      id: id,
+      active_job_id: active_job_id,
+      queue_name: Map.get(attrs, :queue_name) || Map.get(attrs, "queue_name"),
+      priority: Map.get(attrs, :priority) || Map.get(attrs, "priority") || 0,
+      serialized_params: Map.get(attrs, :serialized_params) || Map.get(attrs, "serialized_params"),
+      scheduled_at: Map.get(attrs, :scheduled_at) || Map.get(attrs, "scheduled_at"),
+      job_class: Map.get(attrs, :job_class) || Map.get(attrs, "job_class"),
+      concurrency_key: Map.get(attrs, :concurrency_key) || Map.get(attrs, "concurrency_key"),
+      cron_key: Map.get(attrs, :cron_key) || Map.get(attrs, "cron_key"),
+      cron_at: Map.get(attrs, :cron_at) || Map.get(attrs, "cron_at"),
+      batch_id: Map.get(attrs, :batch_id) || Map.get(attrs, "batch_id"),
+      batch_callback_id: Map.get(attrs, :batch_callback_id) || Map.get(attrs, "batch_callback_id"),
+      labels: Map.get(attrs, :labels) || Map.get(attrs, "labels"),
+      is_discrete: Map.get(attrs, :is_discrete) || Map.get(attrs, "is_discrete"),
+      executions_count: Map.get(attrs, :executions_count) || Map.get(attrs, "executions_count") || 0,
+      inserted_at: now,
+      updated_at: now
+    }
+  end
+
+  defp stringify_or_atom_map(attrs) when is_map(attrs), do: attrs
+
+  defp align_id_with_active_job_id(attrs) do
+    active_job_id = Map.get(attrs, :active_job_id) || Map.get(attrs, "active_job_id")
+
+    cond do
+      is_nil(active_job_id) ->
+        attrs
+
+      Map.has_key?(attrs, :id) or Map.has_key?(attrs, "id") ->
+        attrs
+
+      true ->
+        Map.put(attrs, :id, active_job_id)
     end
   end
 

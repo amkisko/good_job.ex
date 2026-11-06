@@ -228,6 +228,37 @@ defmodule GoodJob.JobExecutorTest do
       assert updated_job.performed_at != nil
     end
 
+    test "deletes job and executions when preserve_job_records is false" do
+      repo = Repo.repo()
+      Ecto.Adapters.SQL.Sandbox.checkout(repo)
+
+      original = Application.get_env(:good_job, :config, %{})
+
+      on_exit(fn ->
+        Application.put_env(:good_job, :config, original)
+      end)
+
+      Application.put_env(
+        :good_job,
+        :config,
+        Map.merge(Map.new(original), %{preserve_job_records: false, repo: repo})
+      )
+
+      {:ok, job} = SimpleJob.enqueue(%{})
+      assert {:ok, :ok} = JobExecutor.execute(job, nil)
+
+      assert repo.get(Job, job.id) == nil
+
+      executions =
+        repo.all(
+          from(e in GoodJob.Execution,
+            where: e.active_job_id == ^job.active_job_id
+          )
+        )
+
+      assert executions == []
+    end
+
     test "executes job with return value" do
       repo = Repo.repo()
       Ecto.Adapters.SQL.Sandbox.checkout(repo)

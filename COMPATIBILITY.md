@@ -161,12 +161,25 @@ Do not run `:advisory` and `:skiplocked` workers against the same database at th
 - `:dequeue_query_sort` — `:created_at` (default) or `:scheduled_at` (Ruby v5 direction). Env: `GOOD_JOB_DEQUEUE_QUERY_SORT`.
 - `:threads` — preferred alias for `:max_processes` (Ruby renamed `max_threads` → `threads`). Env: `GOOD_JOB_THREADS`.
 
+## High-throughput recipe (Elixir default stays `:advisory`)
+
+Elixir keeps `:advisory` as the default for shared-database safety with older Ruby workers. For a single-language or already-migrated high-volume queue, prefer this shape without flipping the library default:
+
+1. **`lock_strategy: :skiplocked`** (or roll through `:hybrid` first on a shared DB — see above).
+2. **`GoodJob.Bulk.enqueue/1`** for producer bursts (chunked `insert_all`, one `NOTIFY`).
+3. **Bound `threads` / `max_processes`** around **8–16** per queue pool on one Postgres primary; more threads often raise contention rather than jobs/s.
+4. **`preserve_job_records: false`** when finished job/execution history is not required — deletes the job and its `good_job_executions` rows on success so dequeue indexes stay small.
+5. Size the Ecto pool at least as large as concurrent workers plus notifier connections.
+
+Maintainer load harness: `MIX_ENV=dev mix bench.load` (`benchmarks/load.exs`). Numbers vary by host; treat them as relative, not SLOs.
+
 ## Best Practices
 
 1. Use consistent `max_attempts` across Ruby and Elixir jobs in the same queue
 2. Keep the default constant backoff when you need Ruby ActiveJob `retry_on` parity; override `backoff/1` for exponential or other strategies
 3. Test job processing from both sides when sharing a queue
 4. Run Elixir migrations (including parity indexes) on shared databases that were created only from older Elixir installs
+5. For high enqueue/dequeue volume, use the high-throughput recipe above instead of raising `threads` alone
 
 ## Migration Notes
 

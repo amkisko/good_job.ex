@@ -2,12 +2,22 @@
 
 ## Unreleased
 
+## 1.1.0 (2026-11-06)
+
 - Align schema with Ruby GoodJob 4.24.1 update migrations 16–22: queue-scoped dequeue indexes, executions and batch query indexes, cron index order, drop redundant unfinished indexes, and create `good_job_concurrency_claims`.
 - Sync the canonical create migration and `mix good_job.install` template with that schema (including `lock_type` on `good_jobs` and the claims table).
 - Default `queue_select_limit` to 1000; order dashboard job and batch lists by `inserted_at DESC, id DESC`; ship discarded `job_class` index (Ruby 1795 / 1762 / 1749).
 - Add label-scoped concurrency checks and `ConcurrencyClaim` grant/wait/promote; release claims on job finish and worker crash; deprecate key-only limits toward Ruby v5.
 - Set `good_jobs.id` from `active_job_id` on enqueue to match Ruby discrete job identity.
 - Add `dequeue_query_sort` (`:created_at` default, `:scheduled_at` for Ruby v5 prep) and `threads` as preferred alias of `max_processes`; document skiplocked rolling migrate.
+- Fix `:skiplocked` / `:hybrid` claim UUID binds for Postgrex, return the claimed row from `UPDATE … RETURNING`, and keep hybrid claim+unlock on one `Repo.checkout/1`.
+- Add `Config.poll_interval_ms/0` so continuous poll (`-1` in dev async) never passes a negative delay to `send_after/3`.
+- Make `GoodJob.Bulk` flush with chunked `insert_all` (single NOTIFY still after the batch).
+- Fill free scheduler slots in one poll / on task completion instead of `send_after(0)` per claim; cache PubSub availability; skip redundant post-claim `get!` on the executor path.
+- Claim multiple `:skiplocked` / `:hybrid` jobs per poll with multi-row `SKIP LOCKED` (`claim_many` / `perform_next_batch`).
+- When `preserve_job_records` is false, delete the job and its `good_job_executions` rows together on finish.
+- Add `benchmarks/load.exs` resource harness (`mix bench.load`) measuring BEAM, Postgres stats, WAL/relation growth, and query counts.
+- Document the high-throughput recipe (`:skiplocked` + `Bulk` + bounded `threads` + optional non-preserve) in README and COMPATIBILITY without flipping the `:advisory` default.
 
 ## 1.0.1 (2026-09-04)
 

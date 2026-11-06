@@ -62,16 +62,25 @@ defmodule GoodJob.Poller do
 
     # Start polling if interval is valid.
     #
-    # Important: schedule the first poll after the configured interval rather than
-    # immediately. The tests expect that polling only happens when:
+    # Important: for positive intervals, schedule the first poll after the configured
+    # interval rather than immediately. The tests expect that polling only happens when:
     #   * a :poll message is explicitly sent, or
     #   * a {:good_job_notification, ...} message matches the queue filters.
     #
-    # If we scheduled an immediate poll here, tests that assert "no poll should
-    # happen in response to this notification" would see the background poll
-    # instead, causing flakiness.
-    if poll_interval > 0 do
-      schedule_poll(poll_interval * 1000)
+    # If we scheduled an immediate poll here for positive intervals, tests that assert
+    # "no poll should happen in response to this notification" would see the background
+    # poll instead, causing flakiness.
+    #
+    # Negative interval means continuous polling (dev async): schedule immediately.
+    cond do
+      is_integer(poll_interval) and poll_interval < 0 ->
+        schedule_poll(0)
+
+      is_integer(poll_interval) and poll_interval > 0 ->
+        schedule_poll(poll_interval * 1000)
+
+      true ->
+        :ok
     end
 
     {:ok, state}
@@ -120,8 +129,8 @@ defmodule GoodJob.Poller do
       send(recipient, :poll)
     end)
 
-    # Schedule next poll
-    schedule_poll(state.poll_interval * 1000)
+    # Schedule next poll (negative interval => continuous / 0 ms)
+    schedule_poll(poll_delay_ms(state.poll_interval))
 
     {:noreply, state}
   end
@@ -153,6 +162,9 @@ defmodule GoodJob.Poller do
   def handle_call(:shutdown?, _from, state) do
     {:reply, not state.running, state}
   end
+
+  defp poll_delay_ms(interval_seconds) when is_integer(interval_seconds) and interval_seconds < 0, do: 0
+  defp poll_delay_ms(interval_seconds) when is_integer(interval_seconds), do: interval_seconds * 1000
 
   defp schedule_poll(delay_ms) when is_integer(delay_ms) and delay_ms >= 0 do
     Process.send_after(self(), :poll, delay_ms)
