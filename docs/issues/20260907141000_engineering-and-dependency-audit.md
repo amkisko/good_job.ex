@@ -2,7 +2,7 @@ Recorded 2026-09-07. Elixir library. CI mix hex.audit failed on phoenix_live_vie
 
 ## Participants
 
-- amkisko
+Andrei Makarov (@amkisko)
 
 ## Decisions
 

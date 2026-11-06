@@ -75,6 +75,7 @@ defmodule ReleaseScript do
       package_name = "good_job"
       hex_file = "#{package_name}-#{version}.tar"
 
+      require_changelog_version!(version)
       warn_if_already_released(version, package_name)
 
       IO.puts("\n📦 Building package...")
@@ -132,6 +133,70 @@ defmodule ReleaseScript do
         IO.write(output)
       end
       false
+    end
+  end
+
+  defp require_changelog_version!(version, path \\ "CHANGELOG.md") do
+    unless File.exists?(path) do
+      IO.puts("\033[1;31mrelease requires #{path} with a ## #{version} heading\033[0m")
+      System.halt(1)
+    end
+
+    unless changelog_includes_version?(version, path) do
+      IO.puts(
+        "\033[1;31mrelease requires #{path} to include a version heading for #{version} " <>
+          "(e.g. ## #{version} or ## [#{version}])\033[0m"
+      )
+
+      System.halt(1)
+    end
+  end
+
+  defp changelog_includes_version?(version, path) do
+    case File.read(path) do
+      {:ok, content} ->
+        content
+        |> String.split("\n")
+        |> Enum.any?(fn line ->
+          not String.match?(line, ~r/Unreleased/i) and changelog_line_has_version?(line, version)
+        end)
+
+      _ ->
+        false
+    end
+  end
+
+  defp changelog_line_has_version?(line, version) do
+    if String.match?(line, ~r/Unreleased/i) do
+      false
+    else
+      case Regex.run(~r/^##\s+(.*)$/, line) do
+      [_, rest] ->
+        rest = String.trim(rest)
+
+        cond do
+          String.starts_with?(rest, "[") ->
+            case Regex.run(~r/^\[([^\]]+)\]/, rest) do
+              [_, candidate] -> candidate == version
+              _ -> false
+            end
+
+          rest == version ->
+            true
+
+          String.starts_with?(rest, version <> " ") ->
+            true
+
+          String.starts_with?(rest, version <> "(") ->
+            true
+
+          true ->
+            false
+        end
+
+      _ ->
+        false
+    end
     end
   end
 

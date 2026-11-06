@@ -1,5 +1,9 @@
 # Atom safety, URL parsing, dashboard links, and Ruby parity for 1.0.1
 
+## Participants
+
+Andrei Makarov (@amkisko)
+
 ## Decisions
 
 Patch 1.0.1 folds Unreleased Ruby parity with atom-safety and audit fixes. Hex 1.0.0 already shipped, so mix.exs moves to 1.0.1.

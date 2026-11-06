@@ -1,8 +1,12 @@
 # Ruby GoodJob parity import, iteration 1
 
-Later pass 20260904114000: tests ran, iteration 1 re-audit closed, iteration 2 imported nothing.
+## Participants
+
+Andrei Makarov (@amkisko)
 
 ## Decisions
+
+Later pass 20260904114000: tests ran, iteration 1 re-audit closed, iteration 2 imported nothing.
 
 Port only protocol, schema, and correctness pieces that passed audit. Skip Ruby-only surfaces (ActiveRecord unscoped yield, Fiber isolation, Puma adapter_class, Arel, JRuby, Tapioca, Stimulus UI, Continuation jobs, probe_handler deprecation).
 

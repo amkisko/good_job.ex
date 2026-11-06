@@ -1,5 +1,9 @@
 # Ruby parity: discarded job-class index, select limit default, dashboard page order
 
+## Participants
+
+Andrei Makarov (@amkisko)
+
 ## Decisions
 
 New additive migration add_index_good_jobs_discarded_job_class for (job_class, finished_at) WHERE finished_at IS NOT NULL AND error IS NOT NULL. Same SQL is in the canonical create migration and the install task template. Existing 1.0.1 add_good_job_parity_indexes is left unchanged so it does not re-run.
