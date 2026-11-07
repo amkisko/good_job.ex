@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Bump Hex deps with available security fixes (`ecto`, `decimal`, `phoenix_html`, `plug_crypto`, `cowboy`, `cowlib`, `ranch`); ignore remaining cowboy/cowlib advisories until patched Hex releases ship.
+
 ## 1.1.0 (2026-11-06)
 
 - Align schema with Ruby GoodJob 4.24.1 update migrations 16–22: queue-scoped dequeue indexes, executions and batch query indexes, cron index order, drop redundant unfinished indexes, and create `good_job_concurrency_claims`.

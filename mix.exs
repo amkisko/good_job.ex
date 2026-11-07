@@ -21,12 +21,13 @@ defmodule GoodJob.MixProject do
       ],
       test_coverage: [tool: ExCoveralls],
       hex: [
+        # No Hex release yet for these cowlib/cowboy fixes (git-only as of 2026-11-06).
         ignore_advisories: [
-          "EEF-CVE-2026-43969",
-          "EEF-CVE-2026-43971",
+          "EEF-CVE-2026-113431",
+          "EEF-CVE-2026-115701",
           "EEF-CVE-2026-43966",
-          "CVE-2026-43969",
-          "CVE-2026-43971",
+          "CVE-2026-113431",
+          "CVE-2026-115701",
           "CVE-2026-43966"
         ]
       ]
@@ -71,7 +72,7 @@ defmodule GoodJob.MixProject do
       # Phoenix dependencies (optional, for Phoenix integration)
       {:phoenix, "~> 1.8", optional: true},
       {:phoenix_live_view, "~> 1.1", optional: true},
-      {:phoenix_html, "~> 4.3", optional: true},
+      {:phoenix_html, "~> 4.4", optional: true},
       {:plug, "~> 1.19", optional: true},
       {:plug_cowboy, "~> 2.8", optional: true},
 
